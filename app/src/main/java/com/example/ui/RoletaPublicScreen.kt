@@ -1,13 +1,17 @@
 package com.example.ui
 
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseOutCubic
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,15 +19,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.PrizeEntity
-import com.example.viewmodel.CodeStatus
 import com.example.viewmodel.RoletaViewModel
+import com.example.viewmodel.CodeStatus
+import com.example.R
 import kotlinx.coroutines.launch
 import kotlin.math.cos
 import kotlin.math.sin
@@ -38,126 +46,142 @@ fun RoletaPublicScreen(
         viewModel.loadCampaignBySlug(slug)
     }
 
-    val campaign by viewModel.currentCampaign.collectAsState()
+    val currentCampaign by viewModel.currentCampaign.collectAsState()
     val prizes by viewModel.prizes.collectAsState()
     val settings by viewModel.settings.collectAsState()
-    val codeStatus by viewModel.codeValidationStatus.collectAsState()
     val activeCode by viewModel.activeCode.collectAsState()
+    val codeValidationStatus by viewModel.codeValidationStatus.collectAsState()
     val spinResult by viewModel.spinResult.collectAsState()
-    val isSpinning by viewModel.isSpinning.collectAsState()
 
     var codeInput by remember { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
-
-    var targetRotation by remember { mutableStateOf(0f) }
     val rotationAnim = remember { Animatable(0f) }
+    var targetRotation by remember { mutableStateOf(0f) }
 
-    val activePrizes = prizes.filter { it.unlimitedQuantity || it.quantity > 0 }
-
-    val bgColorHex = settings["bg_color"] ?: "#0F172A"
-    val textColorHex = settings["text_color"] ?: "#FFFFFF"
-    val btnColorHex = settings["btn_color"] ?: "#10B981"
-    val btnTextColorHex = settings["btn_text_color"] ?: "#FFFFFF"
-
-    val bgColor = try { Color(android.graphics.Color.parseColor(bgColorHex)) } catch (e: Exception) { Color(0xFF0F172A) }
-    val textColor = try { Color(android.graphics.Color.parseColor(textColorHex)) } catch (e: Exception) { Color.White }
-    val btnColor = try { Color(android.graphics.Color.parseColor(btnColorHex)) } catch (e: Exception) { Color(0xFF10B981) }
-    val btnTextColor = try { Color(android.graphics.Color.parseColor(btnTextColorHex)) } catch (e: Exception) { Color.White }
+    val activePrizes = prizes.filter { it.active && (it.unlimitedQuantity || it.quantity > 0) }
+    val scrollState = rememberScrollState()
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(bgColor)
-            .padding(24.dp),
-        contentAlignment = Alignment.Center
+            .background(Color(0xFF0B0F19))
     ) {
+        // Background poster matching the reference image exactly
+        Image(
+            painter = painterResource(id = R.drawable.roleta_poster),
+            contentDescription = "Roleta da Sorte Poster",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // Dark overlay gradient for readability
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color(0xFF0B0F19).copy(alpha = 0.85f), Color(0xFF0B0F19))
+                    )
+                )
+        )
+
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .widthIn(max = 480.dp),
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text(
-                text = settings["title"] ?: "Gire e Ganhe!",
-                style = MaterialTheme.typography.headlineLarge.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = textColor,
-                    fontSize = 32.sp
-                ),
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = settings["subtitle"] ?: "Teste sua sorte e ganhe prêmios exclusivos.",
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    color = textColor.copy(alpha = 0.8f),
-                    fontSize = 16.sp
-                ),
-                textAlign = TextAlign.Center
-            )
+            Spacer(modifier = Modifier.height(250.dp)) // Space for poster header
 
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Wheel
+            // Gorgeous Casino Wheel with Golden Rim, Glowing Bulbs, and Spinning Slices
             Box(
                 modifier = Modifier
-                    .size(320.dp)
-                    .padding(16.dp),
+                    .size(310.dp)
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(Color(0xFFFEF08A), Color(0xFFEAB308), Color(0xFF78350F))
+                        ),
+                        shape = CircleShape
+                    )
+                    .padding(14.dp)
+                    .shadow(30.dp, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Canvas(
+                // Inner Wheel Container
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .rotate(rotationAnim.value)
+                        .clip(CircleShape)
+                        .background(Color(0xFF060913)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    val sliceCount = if (activePrizes.isEmpty()) 1 else activePrizes.size
-                    val sweepAngle = 360f / sliceCount
-                    val wheelColors = listOf(
-                        android.graphics.Color.parseColor("#3B82F6"),
-                        android.graphics.Color.parseColor("#8B5CF6"),
-                        android.graphics.Color.parseColor("#EC4899"),
-                        android.graphics.Color.parseColor("#F59E0B"),
-                        android.graphics.Color.parseColor("#10B981"),
-                        android.graphics.Color.parseColor("#6366F1"),
-                        android.graphics.Color.parseColor("#14B8A6")
-                    )
-
-                    for (i in 0 until sliceCount) {
-                        val startAngle = i * sweepAngle
-                        val colorInt = wheelColors[i % wheelColors.size]
-                        
-                        drawArc(
-                            color = Color(colorInt),
-                            startAngle = startAngle,
-                            sweepAngle = sweepAngle,
-                            useCenter = true
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .rotate(rotationAnim.value)
+                    ) {
+                        val sliceCount = if (activePrizes.isEmpty()) 1 else activePrizes.size
+                        val sweepAngle = 360f / sliceCount
+                        val wheelColors = listOf(
+                            android.graphics.Color.parseColor("#7C3AED"), // Purple
+                            android.graphics.Color.parseColor("#2563EB"), // Blue
+                            android.graphics.Color.parseColor("#059669"), // Green
+                            android.graphics.Color.parseColor("#DB2777"), // Pink
+                            android.graphics.Color.parseColor("#EA580C")  // Orange
                         )
 
-                        drawContext.canvas.nativeCanvas.apply {
-                            val angleRad = Math.toRadians((startAngle + sweepAngle / 2).toDouble())
-                            val radius = size.width / 3.5f
-                            val x = center.x + (radius * cos(angleRad)).toFloat()
-                            val y = center.y + (radius * sin(angleRad)).toFloat()
+                        for (i in 0 until sliceCount) {
+                            val startAngle = i * sweepAngle
+                            val colorInt = wheelColors[i % wheelColors.size]
+                            
+                            drawArc(
+                                color = Color(colorInt),
+                                startAngle = startAngle,
+                                sweepAngle = sweepAngle,
+                                useCenter = true
+                            )
 
-                            val paint = android.graphics.Paint().apply {
-                                color = android.graphics.Color.WHITE
-                                textSize = 36f
-                                textAlign = android.graphics.Paint.Align.CENTER
-                                isAntiAlias = true
-                                isFakeBoldText = true
+                            // Draw slice border line
+                            drawArc(
+                                color = Color(0xFFFDE047),
+                                startAngle = startAngle,
+                                sweepAngle = 1f,
+                                useCenter = true
+                            )
+
+                            drawContext.canvas.nativeCanvas.apply {
+                                val angleRad = Math.toRadians((startAngle + sweepAngle / 2).toDouble())
+                                val radius = size.width / 3.2f
+                                val x = center.x + (radius * cos(angleRad)).toFloat()
+                                val y = center.y + (radius * sin(angleRad)).toFloat()
+
+                                val paint = android.graphics.Paint().apply {
+                                    color = android.graphics.Color.WHITE
+                                    textSize = 32f
+                                    textAlign = android.graphics.Paint.Align.CENTER
+                                    isAntiAlias = true
+                                    isFakeBoldText = true
+                                    setShadowLayer(6f, 0f, 2f, android.graphics.Color.BLACK)
+                                }
+                                val displayText = if (activePrizes.isNotEmpty()) activePrizes[i].displayText else "Prêmio"
+                                drawText(displayText, x, y + 10f, paint)
                             }
-                            val displayText = if (activePrizes.isNotEmpty()) activePrizes[i].displayText else "Prêmio"
-                            drawText(displayText, x, y + 12f, paint)
                         }
                     }
                 }
 
+                // Center Gold Cap with Clover
                 Box(
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(56.dp)
                         .clip(CircleShape)
-                        .background(Color.White)
+                        .background(
+                            brush = Brush.radialGradient(
+                                colors = listOf(Color(0xFFFEF08A), Color(0xFFCA8A04))
+                            )
+                        )
                         .padding(4.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -165,164 +189,231 @@ fun RoletaPublicScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .clip(CircleShape)
-                            .background(Color(0xFFEF4444)),
+                            .background(Color(0xFF0B0F19)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.Star,
-                            contentDescription = "Ponteiro",
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
+                            contentDescription = "Centro",
+                            tint = Color(0xFFFDE047),
+                            modifier = Modifier.size(26.dp)
                         )
                     }
                 }
+
+                // Top Casino Pointer
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .offset(y = (-4).dp)
+                        .size(32.dp)
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(Color(0xFFEF4444), Color(0xFF991B1B))
+                            ),
+                            shape = CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .background(Color(0xFFFDE047), CircleShape)
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(30.dp))
 
-            if (activeCode == null) {
-                OutlinedTextField(
-                    value = codeInput,
-                    onValueChange = { codeInput = it },
-                    placeholder = { Text(settings["code_placeholder"] ?: "Digite seu código") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = btnColor,
-                        unfocusedBorderColor = textColor.copy(alpha = 0.5f),
-                        focusedTextColor = textColor,
-                        unfocusedTextColor = textColor,
-                        focusedPlaceholderColor = textColor.copy(alpha = 0.5f),
-                        unfocusedPlaceholderColor = textColor.copy(alpha = 0.5f)
-                    ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Button(
-                    onClick = { viewModel.validateCode(codeInput) },
-                    colors = ButtonDefaults.buttonColors(containerColor = btnColor, contentColor = btnTextColor),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                ) {
-                    Text(
-                        text = settings["liberate_button"] ?: "LIBERAR ROLETA",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
-                }
-
-                if (codeStatus is CodeStatus.Error) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = (codeStatus as CodeStatus.Error).message,
-                        color = Color(0xFFEF4444),
-                        fontSize = 14.sp,
-                        textAlign = TextAlign.Center
-                    )
-                }
-            } else if (spinResult == null) {
-                Text(
-                    text = settings["valid_code_msg"] ?: "Código validado! Você tem 1 giro.",
-                    color = Color(0xFF10B981),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Button(
-                    onClick = {
-                        viewModel.spinWheel { prize, prizeIndex ->
-                            coroutineScope.launch {
-                                val sliceCount = if (activePrizes.isEmpty()) 1 else activePrizes.size
-                                val degreesPerSlice = 360f / sliceCount
-                                val extraSpins = 360f * 5
-                                val targetSliceAngle = prizeIndex * degreesPerSlice + (degreesPerSlice / 2)
-                                targetRotation = rotationAnim.value + extraSpins + (360f - (rotationAnim.value % 360f)) - targetSliceAngle
-
-                                rotationAnim.animateTo(
-                                    targetValue = targetRotation,
-                                    animationSpec = tween(
-                                        durationMillis = 5000,
-                                        easing = FastOutSlowInEasing
-                                    )
-                                )
-                            }
-                        }
-                    },
-                    enabled = !isSpinning,
-                    colors = ButtonDefaults.buttonColors(containerColor = btnColor, contentColor = btnTextColor),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                ) {
-                    Text(
-                        text = if (isSpinning) (settings["spinning_msg"] ?: "Girando...") else (settings["spin_button"] ?: "GIRAR AGORA"),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp
-                    )
-                }
-            } else {
-                Card(
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+            // Interaction Area (Inputs / Buttons matching poster)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 440.dp)
+            ) {
+                if (activeCode == null) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(24.dp),
+                            .background(Color(0xFF0F172A).copy(alpha = 0.95f), RoundedCornerShape(24.dp))
+                            .padding(20.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = codeInput,
+                            onValueChange = { codeInput = it },
+                            placeholder = { Text("Digite seu código (ex: RLT-7X92KP)") },
+                            singleLine = true,
+                            shape = RoundedCornerShape(16.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color(0xFFFACC15),
+                                unfocusedBorderColor = Color.Gray,
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedPlaceholderColor = Color.Gray,
+                                unfocusedPlaceholderColor = Color.Gray
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Button(
+                            onClick = { viewModel.validateCode(codeInput) },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp)
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(Color(0xFFFEF08A), Color(0xFFFACC15), Color(0xFFCA8A04))
+                                    ),
+                                    RoundedCornerShape(16.dp)
+                                )
+                        ) {
+                            Text(
+                                text = "LIBERAR ROLETA",
+                                fontWeight = FontWeight.Black,
+                                fontSize = 16.sp,
+                                color = Color(0xFF1E1B4B)
+                            )
+                        }
+
+                        if (codeValidationStatus is CodeStatus.Error) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = (codeValidationStatus as CodeStatus.Error).message,
+                                color = Color(0xFFEF4444),
+                                fontSize = 13.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                } else if (spinResult == null) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = settings["result_title"] ?: "🎉 PARABÉNS! 🎉",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF10B981),
-                                fontSize = 24.sp
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = settings["result_prize_prefix"] ?: "VOCÊ GANHOU",
-                            color = Color.White.copy(alpha = 0.7f),
-                            fontSize = 14.sp
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = spinResult?.resultText ?: spinResult?.name ?: "Prêmio",
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = Color.Yellow,
-                                fontSize = 28.sp
-                            ),
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = spinResult?.description ?: "",
-                            color = Color.White.copy(alpha = 0.9f),
+                            text = "Código validado com sucesso!",
+                            color = Color(0xFF10B981),
+                            fontWeight = FontWeight.Bold,
                             fontSize = 14.sp,
                             textAlign = TextAlign.Center
                         )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = settings["result_success_msg"] ?: "Seu prêmio foi registrado com sucesso.",
-                            color = Color(0xFF94A3B8),
-                            fontSize = 12.sp,
-                            textAlign = TextAlign.Center
-                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        Button(
+                            onClick = {
+                                viewModel.spinWheel { prize, prizeIndex ->
+                                    coroutineScope.launch {
+                                        val sliceCount = if (activePrizes.isEmpty()) 1 else activePrizes.size
+                                        val degreesPerSlice = 360f / sliceCount
+                                        val extraSpins = 360f * 6
+                                        val targetSliceAngle = prizeIndex * degreesPerSlice + (degreesPerSlice / 2)
+                                        targetRotation = rotationAnim.value + extraSpins + (360f - (rotationAnim.value % 360f)) - targetSliceAngle
+
+                                        rotationAnim.animateTo(
+                                            targetValue = targetRotation,
+                                            animationSpec = tween(
+                                                durationMillis = 5000,
+                                                easing = EaseOutCubic
+                                            )
+                                        )
+                                    }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                            shape = RoundedCornerShape(24.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(64.dp)
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(Color(0xFFFEF08A), Color(0xFFFACC15), Color(0xFFCA8A04))
+                                    ),
+                                    RoundedCornerShape(24.dp)
+                                )
+                                .shadow(10.dp, RoundedCornerShape(24.dp))
+                        ) {
+                            Text(
+                                text = "CLIQUE AQUI E GIRE A ROLETA",
+                                fontWeight = FontWeight.Black,
+                                fontSize = 17.sp,
+                                color = Color(0xFF1E1B4B),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                } else {
+                    val prize = spinResult!!
+                    Card(
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E293B)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "🎉 PARABÉNS! 🎉",
+                                fontWeight = FontWeight.Black,
+                                fontSize = 22.sp,
+                                color = Color(0xFFFBBF24),
+                                textAlign = TextAlign.Center
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Text(
+                                text = "VOCÊ GANHOU",
+                                fontSize = 12.sp,
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                text = prize.resultText.ifEmpty { prize.name },
+                                fontWeight = FontWeight.Black,
+                                fontSize = 28.sp,
+                                color = Color.White,
+                                textAlign = TextAlign.Center
+                            )
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Text(
+                                text = prize.description,
+                                fontSize = 14.sp,
+                                color = Color.White.copy(alpha = 0.8f),
+                                textAlign = TextAlign.Center
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Text(
+                                text = "Seu prêmio foi registrado com sucesso no sistema.",
+                                fontSize = 12.sp,
+                                color = Color(0xFF10B981),
+                                textAlign = TextAlign.Center,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(40.dp))
         }
     }
 }

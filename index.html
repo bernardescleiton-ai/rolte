@@ -6,11 +6,34 @@
     <title>Roleta da Sorte</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .gold-text {
+            background: linear-gradient(180deg, #FFFDF0 0%, #FDE047 50%, #CA8A04 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 3px 8px rgba(0,0,0,0.8));
+        }
+        .gold-btn {
+            background: linear-gradient(180deg, #FEF08A 0%, #FACC15 50%, #B45309 100%);
+            box-shadow: 0 8px 30px rgba(250, 204, 21, 0.7), inset 0 2px 4px rgba(255,255,255,0.9), inset 0 -2px 4px rgba(120,53,15,0.9);
+        }
+        .casino-rim {
+            background: radial-gradient(circle, #FEF08A 0%, #EAB308 50%, #78350F 100%);
+            box-shadow: 0 0 70px rgba(234, 179, 8, 0.8), inset 0 0 25px rgba(255,255,255,0.8);
+        }
+        @keyframes pulse-glow {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.9); }
+        }
+        .casino-bulb {
+            animation: pulse-glow 1s infinite alternate;
+        }
+    </style>
 </head>
-<body class="bg-slate-950 text-white min-h-screen flex flex-col">
+<body class="bg-[#060913] text-white min-h-screen flex flex-col relative overflow-x-hidden">
 
     <!-- App Container -->
-    <div id="app" class="flex-1 flex flex-col">
+    <div id="app" class="flex-1 flex flex-col relative z-10">
         <!-- Rendered dynamically by JS -->
     </div>
 
@@ -24,11 +47,11 @@
                     { id: 1, name: "Outubro Premiado", slug: "outubro", active: true }
                 ],
                 prizes: [
-                    { id: 1, campaignId: 1, name: "R$ 5 de Desconto", description: "Desconto em compras acima de R$ 50", displayText: "R$ 5", resultText: "R$ 5 DE DESCONTO", discount: "R$ 5", weight: 40, quantity: 500, unlimitedQuantity: false, active: true },
+                    { id: 1, campaignId: 1, name: "R$ 5 de Desconto", description: "Desconto em compras acima de R$ 50", displayText: "R$ 5 OFF", resultText: "R$ 5 DE DESCONTO", discount: "R$ 5", weight: 40, quantity: 500, unlimitedQuantity: false, active: true },
                     { id: 2, campaignId: 1, name: "Frete Grátis", description: "Frete grátis para todo o Brasil", displayText: "Frete Grátis", resultText: "FRETE GRÁTIS", discount: "Frete Grátis", weight: 30, quantity: 200, unlimitedQuantity: false, active: true },
-                    { id: 3, campaignId: 1, name: "R$ 20 de Desconto", description: "Desconto especial em qualquer produto", displayText: "R$ 20", resultText: "R$ 20 DE DESCONTO", discount: "R$ 20", weight: 20, quantity: 50, unlimitedQuantity: false, active: true },
+                    { id: 3, campaignId: 1, name: "R$ 20 de Desconto", description: "Desconto especial em qualquer produto", displayText: "R$ 20 OFF", resultText: "R$ 20 DE DESCONTO", discount: "R$ 20", weight: 20, quantity: 50, unlimitedQuantity: false, active: true },
                     { id: 4, campaignId: 1, name: "Brinde Surpresa", description: "Um brinde exclusivo no seu pedido", displayText: "Brinde", resultText: "BRINDE SURPRESA", discount: "Brinde", weight: 8, quantity: 20, unlimitedQuantity: false, active: true },
-                    { id: 5, campaignId: 1, name: "R$ 100 de Desconto", description: "Prêmio máximo da roleta!", displayText: "R$ 100", resultText: "R$ 100 DE DESCONTO", discount: "R$ 100", weight: 2, quantity: 5, unlimitedQuantity: false, active: true }
+                    { id: 5, campaignId: 1, name: "R$ 100 de Desconto", description: "Prêmio máximo da roleta!", displayText: "R$ 100 OFF", resultText: "R$ 100 DE DESCONTO", discount: "R$ 100", weight: 2, quantity: 5, unlimitedQuantity: false, active: true }
                 ],
                 codes: [
                     { id: 1, campaignId: 1, code: "RLT-7X92KP", status: "AVAILABLE", usedAt: null },
@@ -40,20 +63,20 @@
                 spins: [],
                 settings: {
                     1: {
-                        title: "Gire e Ganhe!",
-                        subtitle: "Você tem uma chance de ganhar um prêmio exclusivo.",
+                        title: "ROLETA DA SORTE",
+                        subtitle: "Gire a roleta e ganhe descontos e benefícios incríveis!",
                         code_placeholder: "Digite seu código (ex: RLT-7X92KP)",
                         liberate_button: "LIBERAR ROLETA",
                         valid_code_msg: "Código validado com sucesso!",
-                        spin_button: "GIRAR AGORA",
+                        spin_button: "CLIQUE AQUI E GIRE A ROLETA",
                         spinning_msg: "Girando roleta...",
                         result_title: "🎉 PARABÉNS! 🎉",
                         result_prize_prefix: "VOCÊ GANHOU",
                         result_success_msg: "Seu prêmio foi registrado com sucesso no sistema.",
-                        bg_color: "#0F172A",
+                        bg_color: "#060913",
                         text_color: "#FFFFFF",
-                        btn_color: "#10B981",
-                        btn_text_color: "#FFFFFF"
+                        btn_color: "#FACC15",
+                        btn_text_color: "#1E1B4B"
                     }
                 }
             };
@@ -123,43 +146,77 @@
 
             container.innerHTML = `
                 <div class="flex-1 flex flex-col items-center justify-center p-4 relative" style="background-color: ${settings.bg_color}; color: ${settings.text_color};">
-                    <div class="max-w-md w-full text-center px-4">
-                        <h1 class="text-3xl font-extrabold mb-2">${settings.title}</h1>
-                        <p class="text-sm opacity-80 mb-8">${settings.subtitle}</p>
+                    <div class="max-w-md w-full text-center px-4 py-6 flex flex-col items-center">
+                        
+                        <!-- Header Title matching reference image -->
+                        <div class="mb-4 text-center">
+                            <h2 class="text-xs font-extrabold tracking-[0.4em] text-white uppercase opacity-90">ROLETA DA</h2>
+                            <h1 class="text-4xl sm:text-5xl font-black tracking-wider gold-text uppercase flex items-center justify-center gap-2">
+                                SORTE <i class="fa-solid fa-clover text-yellow-400 text-3xl"></i>
+                            </h1>
+                            <p class="text-xs sm:text-sm font-semibold text-yellow-100/90 mt-2 max-w-xs mx-auto">${settings.subtitle}</p>
+                        </div>
 
-                        <!-- Wheel Container -->
-                        <div class="relative w-72 h-72 mx-auto mb-8 flex items-center justify-center">
-                            <canvas id="wheelCanvas" width="280" height="280" class="w-full h-full rounded-full shadow-2xl transition-transform duration-1000"></canvas>
-                            <!-- Pointer -->
-                            <div class="absolute -top-3 w-8 h-8 bg-red-500 clip-polygon shadow-lg rounded-full flex items-center justify-center border-2 border-white">
-                                <i class="fa-solid fa-star text-white text-xs"></i>
+                        <!-- Wheel Container with Casino Glowing Rim & Bulbs -->
+                        <div class="relative w-80 h-80 sm:w-88 sm:h-88 mx-auto mb-6 flex items-center justify-center">
+                            <!-- Outer Casino Rim with Bulbs -->
+                            <div class="absolute inset-0 rounded-full casino-rim p-5 flex items-center justify-center shadow-[0_0_80px_rgba(234,179,8,0.8)]">
+                                <!-- Glowing Light Bulbs Around Rim -->
+                                <div class="absolute inset-2 rounded-full border-2 border-dashed border-yellow-100/60 pointer-events-none"></div>
+                                <div class="absolute top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-white rounded-full casino-bulb shadow-[0_0_8px_#FFF]"></div>
+                                <div class="absolute bottom-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-white rounded-full casino-bulb shadow-[0_0_8px_#FFF]" style="animation-delay: 0.3s;"></div>
+                                <div class="absolute left-1 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full casino-bulb shadow-[0_0_8px_#FFF]" style="animation-delay: 0.6s;"></div>
+                                <div class="absolute right-1 top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full casino-bulb shadow-[0_0_8px_#FFF]" style="animation-delay: 0.9s;"></div>
+                                <div class="absolute top-6 left-6 w-2.5 h-2.5 bg-white rounded-full casino-bulb shadow-[0_0_6px_#FFF]" style="animation-delay: 0.2s;"></div>
+                                <div class="absolute top-6 right-6 w-2.5 h-2.5 bg-white rounded-full casino-bulb shadow-[0_0_6px_#FFF]" style="animation-delay: 0.5s;"></div>
+                                <div class="absolute bottom-6 left-6 w-2.5 h-2.5 bg-white rounded-full casino-bulb shadow-[0_0_6px_#FFF]" style="animation-delay: 0.7s;"></div>
+                                <div class="absolute bottom-6 right-6 w-2.5 h-2.5 bg-white rounded-full casino-bulb shadow-[0_0_6px_#FFF]" style="animation-delay: 0.4s;"></div>
+
+                                <!-- Inner Wheel Background -->
+                                <div class="w-full h-full rounded-full bg-slate-950 relative flex items-center justify-center overflow-hidden border-2 border-yellow-400 shadow-inner">
+                                    <canvas id="wheelCanvas" width="320" height="320" class="w-full h-full rounded-full transition-transform duration-[5000ms] cubic-bezier(0.15, 0, 0.15, 1)"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- Center Gold Cap with Clover/Star -->
+                            <div class="absolute w-16 h-16 rounded-full bg-gradient-to-tr from-yellow-700 via-yellow-400 to-yellow-200 shadow-2xl flex items-center justify-center border-4 border-yellow-100 z-20">
+                                <div class="w-10 h-10 rounded-full bg-slate-950 flex items-center justify-center shadow-inner">
+                                    <i class="fa-solid fa-clover text-yellow-400 text-xl"></i>
+                                </div>
+                            </div>
+
+                            <!-- Top Casino Pointer -->
+                            <div class="absolute -top-3 w-10 h-11 bg-gradient-to-b from-red-500 via-red-600 to-red-900 shadow-[0_5px_15px_rgba(0,0,0,0.8)] rounded-b-xl flex items-center justify-center border-2 border-yellow-300 z-30">
+                                <div class="w-4 h-4 bg-yellow-300 rounded-full shadow-[0_0_10px_#FDE047] mb-2"></div>
                             </div>
                         </div>
 
                         <!-- Interaction Area -->
-                        <div id="interactionArea">
+                        <div id="interactionArea" class="w-full">
                             ${!currentCodeObj ? `
-                                <div class="space-y-4">
-                                    <input type="text" id="codeInput" placeholder="${settings.code_placeholder}" class="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 text-center font-bold tracking-wider uppercase">
-                                    <button onclick="validateCode(${campaign.id})" style="background-color: ${settings.btn_color}; color: ${settings.btn_text_color};" class="w-full py-4 rounded-xl font-extrabold shadow-lg hover:opacity-90 transition">
+                                <div class="space-y-4 bg-slate-900/95 backdrop-blur-md p-6 rounded-3xl border border-yellow-500/40 shadow-2xl">
+                                    <input type="text" id="codeInput" placeholder="${settings.code_placeholder}" class="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-yellow-400 text-center font-bold tracking-wider uppercase text-sm shadow-inner">
+                                    <button onclick="validateCode(${campaign.id})" class="w-full py-4 rounded-2xl font-black text-base gold-btn text-indigo-950 hover:scale-[1.02] active:scale-[0.98] transition uppercase tracking-wider shadow-lg">
                                         ${settings.liberate_button}
                                     </button>
-                                    <div id="codeError" class="text-red-400 text-sm font-medium"></div>
+                                    <div id="codeError" class="text-red-400 text-xs font-semibold"></div>
                                 </div>
                             ` : !lastWonPrize ? `
-                                <div class="space-y-4">
-                                    <p class="text-emerald-400 font-bold">${settings.valid_code_msg}</p>
-                                    <button onclick="spinWheel(${campaign.id})" id="spinBtn" style="background-color: ${settings.btn_color}; color: ${settings.btn_text_color};" class="w-full py-4 rounded-xl font-extrabold shadow-lg hover:opacity-90 transition text-lg">
-                                        ${settings.spin_button}
+                                <div class="space-y-3">
+                                    <p class="text-emerald-400 font-bold text-sm bg-emerald-950/60 py-2.5 px-4 rounded-xl border border-emerald-500/40 shadow-md">${settings.valid_code_msg}</p>
+                                    <button onclick="spinWheel(${campaign.id})" id="spinBtn" class="w-full py-5 rounded-2xl font-black text-lg sm:text-xl gold-btn text-indigo-950 shadow-[0_8px_35px_rgba(250,204,21,0.8)] hover:scale-[1.02] active:scale-[0.98] transition uppercase tracking-wider flex items-center justify-center gap-3">
+                                        <span>${settings.spin_button}</span>
+                                        <i class="fa-solid fa-hand-pointer text-xl animate-bounce"></i>
                                     </button>
                                 </div>
                             ` : `
-                                <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl space-y-4">
-                                    <h2 class="text-2xl font-extrabold text-emerald-400">${settings.result_title}</h2>
-                                    <p class="text-xs uppercase tracking-widest opacity-70">${settings.result_prize_prefix}</p>
-                                    <div class="text-3xl font-black text-yellow-400">${lastWonPrize.resultText || lastWonPrize.name}</div>
+                                <div class="bg-slate-900/95 border border-yellow-500/60 p-6 rounded-3xl shadow-2xl space-y-3 backdrop-blur-md">
+                                    <h2 class="text-2xl font-black text-yellow-400">${settings.result_title}</h2>
+                                    <p class="text-xs uppercase tracking-widest text-slate-400">${settings.result_prize_prefix}</p>
+                                    <div class="text-3xl font-black text-white drop-shadow-[0_2px_8px_rgba(251,191,36,0.7)]">${lastWonPrize.resultText || lastWonPrize.name}</div>
                                     <p class="text-sm text-slate-300">${lastWonPrize.description}</p>
-                                    <p class="text-xs text-slate-500 mt-2">${settings.result_success_msg}</p>
+                                    <p class="text-xs text-yellow-400/80 mt-2 font-medium">${settings.result_success_msg}</p>
+                                    <button onclick="location.reload()" class="mt-4 px-6 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-yellow-400 font-bold text-xs uppercase tracking-wider transition shadow-md">Girar Novamente</button>
                                 </div>
                             `}
                         </div>
@@ -177,14 +234,15 @@
             const width = canvas.width;
             const height = canvas.height;
             const center = width / 2;
-            const radius = center - 10;
+            const radius = center - 6;
 
             ctx.clearRect(0, 0, width, height);
 
             if (prizes.length === 0) return;
 
             const sliceAngle = (2 * Math.PI) / prizes.length;
-            const colors = ["#3B82F6", "#8B5CF6", "#EC4899", "#F59E0B", "#10B981", "#6366F1", "#14B8A6"];
+            // Rich casino palette matching reference image: Purple, Blue, Green, Pink, Orange
+            const colors = ["#7C3AED", "#2563EB", "#059669", "#DB2777", "#EA580C", "#4F46E5", "#0D9488", "#CA8A04"];
 
             ctx.save();
             ctx.translate(center, center);
@@ -202,17 +260,20 @@
 
                 ctx.fillStyle = colors[i % colors.length];
                 ctx.fill();
-                ctx.strokeStyle = "#0F172A";
-                ctx.lineWidth = 2;
+                ctx.strokeStyle = "#FDE047";
+                ctx.lineWidth = 3;
                 ctx.stroke();
 
+                // Draw text
                 ctx.save();
                 ctx.translate(center, center);
                 ctx.rotate(startAngle + sliceAngle / 2);
                 ctx.textAlign = "right";
                 ctx.fillStyle = "#FFFFFF";
-                ctx.font = "bold 12px sans-serif";
-                ctx.fillText(prize.displayText || prize.name, radius - 15, 4);
+                ctx.shadowColor = "rgba(0, 0, 0, 0.95)";
+                ctx.shadowBlur = 10;
+                ctx.font = "bold 15px sans-serif";
+                ctx.fillText(prize.displayText || prize.name, radius - 24, 6);
                 ctx.restore();
             });
 
@@ -307,7 +368,7 @@
 
             const prizeIndex = prizes.findIndex(p => p.id === selectedPrize.id);
             const sliceAngle = 360 / prizes.length;
-            const targetAngle = 360 * 5 + (360 - (prizeIndex * sliceAngle + sliceAngle / 2));
+            const targetAngle = 360 * 6 + (360 - (prizeIndex * sliceAngle + sliceAngle / 2));
 
             const canvas = document.getElementById("wheelCanvas");
             if (canvas) {
@@ -326,22 +387,22 @@
 
         function renderAdmin(container, db) {
             container.innerHTML = `
-                <div class="flex-1 flex flex-col bg-slate-900 text-white">
+                <div class="flex-1 flex flex-col bg-slate-900 text-white min-h-screen">
                     <header class="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center">
                         <h1 class="text-xl font-bold flex items-center gap-2">
-                            <i class="fa-solid fa-gauge-high text-emerald-500"></i> Painel Administrativo
+                            <i class="fa-solid fa-gauge-high text-yellow-400"></i> Painel Administrativo
                         </h1>
-                        <a href="#roleta/outubro" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-2">
+                        <a href="#roleta/outubro" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 px-4 py-2 rounded-xl text-sm font-extrabold transition flex items-center gap-2 shadow-lg">
                             <i class="fa-solid fa-eye"></i> Ver Roleta Pública
                         </a>
                     </header>
 
                     <div class="bg-slate-900 border-b border-slate-800 flex overflow-x-auto px-4 gap-2">
-                        <button onclick="setAdminTab('campaigns')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'campaigns' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400'}">Campanhas</button>
-                        <button onclick="setAdminTab('prizes')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'prizes' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400'}">Prêmios & Frases</button>
-                        <button onclick="setAdminTab('codes')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'codes' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400'}">Códigos</button>
-                        <button onclick="setAdminTab('results')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'results' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400'}">Resultados</button>
-                        <button onclick="setAdminTab('settings')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'settings' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400'}">Configurações</button>
+                        <button onclick="setAdminTab('campaigns')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'campaigns' ? 'border-yellow-400 text-yellow-400' : 'border-transparent text-slate-400'}">Campanhas</button>
+                        <button onclick="setAdminTab('prizes')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'prizes' ? 'border-yellow-400 text-yellow-400' : 'border-transparent text-slate-400'}">Prêmios & Frases</button>
+                        <button onclick="setAdminTab('codes')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'codes' ? 'border-yellow-400 text-yellow-400' : 'border-transparent text-slate-400'}">Códigos</button>
+                        <button onclick="setAdminTab('results')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'results' ? 'border-yellow-400 text-yellow-400' : 'border-transparent text-slate-400'}">Resultados</button>
+                        <button onclick="setAdminTab('settings')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'settings' ? 'border-yellow-400 text-yellow-400' : 'border-transparent text-slate-400'}">Configurações</button>
                     </div>
 
                     <main class="flex-1 p-6 overflow-y-auto max-w-5xl w-full mx-auto" id="adminContent">
@@ -362,14 +423,14 @@
                     <div class="space-y-6">
                         <div class="flex justify-between items-center">
                             <h2 class="text-2xl font-bold">Campanhas</h2>
-                            <button onclick="openNewCampaignModal()" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl font-bold text-sm">+ Nova Campanha</button>
+                            <button onclick="openNewCampaignModal()" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 px-4 py-2 rounded-xl font-bold text-sm">+ Nova Campanha</button>
                         </div>
                         <div class="grid gap-4">
                             ${db.campaigns.map(c => `
                                 <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex justify-between items-center">
                                     <div>
                                         <h3 class="font-bold text-lg">${c.name}</h3>
-                                        <p class="text-sm text-emerald-400">Link: <a href="#roleta/${c.slug}" class="underline">/#roleta/${c.slug}</a></p>
+                                        <p class="text-sm text-yellow-400">Link: <a href="#roleta/${c.slug}" class="underline">/#roleta/${c.slug}</a></p>
                                     </div>
                                     <div class="flex items-center gap-3">
                                         <button onclick="editCampaign(${c.id})" class="text-blue-400 hover:text-blue-300 p-2"><i class="fa-solid fa-pen"></i></button>
@@ -390,7 +451,7 @@
                     <div class="space-y-6">
                         <div class="flex justify-between items-center">
                             <h2 class="text-2xl font-bold">Prêmios & Frases (${activeCamp.name})</h2>
-                            <button onclick="openNewPrizeModal(${activeCamp.id})" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl font-bold text-sm">+ Adicionar Prêmio / Frase</button>
+                            <button onclick="openNewPrizeModal(${activeCamp.id})" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 px-4 py-2 rounded-xl font-bold text-sm">+ Adicionar Prêmio / Frase</button>
                         </div>
                         <div class="grid gap-4">
                             ${prizes.map(p => {
@@ -399,7 +460,7 @@
                                     <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex justify-between items-center">
                                         <div>
                                             <h3 class="font-bold text-lg">${p.name}</h3>
-                                            <p class="text-sm text-slate-300">Texto na Roleta: <span class="font-semibold text-emerald-400">"${p.displayText}"</span> | Peso: ${p.weight} | Probabilidade: <span class="text-emerald-400 font-bold">${prob}%</span></p>
+                                            <p class="text-sm text-slate-300">Texto na Roleta: <span class="font-semibold text-yellow-400">"${p.displayText}"</span> | Peso: ${p.weight} | Probabilidade: <span class="text-yellow-400 font-bold">${prob}%</span></p>
                                             <p class="text-xs text-slate-500">Estoque: ${p.unlimitedQuantity ? 'Ilimitado' : p.quantity}</p>
                                         </div>
                                         <div class="flex items-center gap-3">
@@ -422,7 +483,7 @@
                         <div class="flex justify-between items-center">
                             <h2 class="text-2xl font-bold">Códigos de Liberação</h2>
                             <div class="flex gap-2">
-                                <button onclick="generateCodes(${activeCamp.id}, 50)" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl font-bold text-sm">+ Gerar 50 Códigos</button>
+                                <button onclick="generateCodes(${activeCamp.id}, 50)" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 px-4 py-2 rounded-xl font-bold text-sm">+ Gerar 50 Códigos</button>
                                 <button onclick="exportCodesCSV()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl font-bold text-sm"><i class="fa-solid fa-download"></i> CSV</button>
                             </div>
                         </div>
@@ -466,7 +527,7 @@
                                 <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 space-y-4">
                                     <div class="flex justify-between items-start">
                                         <div>
-                                            <h3 class="font-bold text-lg text-emerald-400">${s.prizeNameSnapshot} (${s.discountSnapshot})</h3>
+                                            <h3 class="font-bold text-lg text-yellow-400">${s.prizeNameSnapshot} (${s.discountSnapshot})</h3>
                                             <p class="text-xs text-slate-400">${new Date(s.createdAt).toLocaleString()}</p>
                                         </div>
                                     </div>
@@ -509,7 +570,7 @@
                                     <input type="text" id="st_btn" value="${s.btn_color}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl">
                                 </div>
                             </div>
-                            <button onclick="saveSettings(${activeCamp.id})" class="bg-emerald-600 hover:bg-emerald-500 w-full py-3 rounded-xl font-bold">Salvar Configurações</button>
+                            <button onclick="saveSettings(${activeCamp.id})" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 w-full py-3 rounded-xl font-bold">Salvar Configurações</button>
                         </div>
                     </div>
                 `;
@@ -659,7 +720,7 @@
             const db = loadDB();
             if (!db.settings[campaignId]) db.settings[campaignId] = { ...db.settings[1] };
             db.settings[campaignId].title = document.getElementById("st_title").value;
-            db.settings[campaignId].subtitle = document.getElementById("st_subtitle".value);
+            db.settings[campaignId].subtitle = document.getElementById("st_subtitle").value;
             db.settings[campaignId].spin_button = document.getElementById("st_spin_btn").value;
             db.settings[campaignId].bg_color = document.getElementById("st_bg").value;
             db.settings[campaignId].btn_color = document.getElementById("st_btn").value;
@@ -698,10 +759,5 @@
             document.body.removeChild(a);
         }
     </script>
-    <style>
-        .clip-polygon {
-            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
-        }
-    </style>
 </body>
 </html>

@@ -38,23 +38,8 @@
     </div>
 
     <script>
-        // --- Database & LocalStorage State Management with URL State Sync ---
+        // --- Database & LocalStorage State Management ---
         const DB_KEY = "roleta_db_v1";
-
-        // Check if URL contains shared state from admin
-        (function checkUrlState() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const stateParam = urlParams.get('state');
-            if (stateParam) {
-                try {
-                    const decodedDB = JSON.parse(atob(stateParam));
-                    localStorage.setItem(DB_KEY, JSON.stringify(decodedDB));
-                    window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
-                } catch (e) {
-                    console.error("Error parsing shared state", e);
-                }
-            }
-        })();
 
         function getInitialData() {
             return {
@@ -148,7 +133,7 @@
         window.addEventListener("hashchange", router);
         window.addEventListener("load", router);
 
-        // --- Public Roleta Screen ---
+        // --- Public Roleta Screen (ZERO admin buttons) ---
         function renderPublicRoleta(container, db, campaign) {
             if (!campaign || !campaign.active) {
                 container.innerHTML = `
@@ -408,18 +393,10 @@
             }, 5000);
         }
 
-        // --- Admin Panel ---
+        // --- Admin Panel (Clean, no shareable link box) ---
         let adminTab = "campaigns";
 
         function renderAdmin(container, db) {
-            let stateJson = "";
-            try {
-                stateJson = btoa(JSON.stringify(db));
-            } catch(e) {
-                stateJson = "";
-            }
-            const shareableUrl = window.location.origin + window.location.pathname + (stateJson ? "?state=" + encodeURIComponent(stateJson) : "") + "#admin";
-
             container.innerHTML = `
                 <div class="flex-1 flex flex-col bg-slate-900 text-white min-h-screen">
                     <header class="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center">
@@ -430,20 +407,6 @@
                             <i class="fa-solid fa-eye"></i> Ver Roleta Pública
                         </a>
                     </header>
-
-                    <!-- Shareable Link Banner with Textarea / Input for Easy Copying -->
-                    <div class="bg-gradient-to-r from-yellow-600/30 to-amber-600/30 border-b border-yellow-500/30 p-5 px-6 flex flex-col gap-3">
-                        <div class="flex justify-between items-center">
-                            <h3 class="font-bold text-yellow-400 text-sm flex items-center gap-2">
-                                <i class="fa-solid fa-share-nodes"></i> Link com Configuração Atual para Clientes
-                            </h3>
-                            <button onclick="navigator.clipboard.writeText(document.getElementById('shareLinkInput').value); alert('Link copiado com sucesso!');" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-black px-4 py-2 rounded-xl text-xs uppercase tracking-wider shadow-lg flex items-center gap-2">
-                                <i class="fa-solid fa-copy"></i> Copiar Link
-                            </button>
-                        </div>
-                        <p class="text-xs text-slate-300">Copie o link abaixo e envie para seu cliente. Ele abrirá a roleta com exatamente todos os prêmios e configurações que você cadastrou:</p>
-                        <input type="text" id="shareLinkInput" readonly value="${shareableUrl}" onclick="this.select()" class="w-full bg-slate-950 border border-yellow-500/40 px-4 py-3 rounded-xl text-xs text-yellow-300 font-mono select-all">
-                    </div>
 
                     <div class="bg-slate-900 border-b border-slate-800 flex overflow-x-auto px-4 gap-2">
                         <button onclick="setAdminTab('campaigns')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'campaigns' ? 'border-yellow-400 text-yellow-400' : 'border-transparent text-slate-400'}">Campanhas</button>

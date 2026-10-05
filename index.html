@@ -39,30 +39,29 @@
 
     <!-- App Container -->
     <div id="app" class="flex-1 flex flex-col relative z-10">
-        <div class="flex-1 flex items-center justify-center p-6 text-center">
-            <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-yellow-400 mx-auto"></div>
-        </div>
+        <!-- Rendered dynamically by JS -->
     </div>
 
     <script>
-        // --- Firebase Initialization & Firestore Sync ---
+        // --- Firebase Cloud Connection ---
         const firebaseConfig = {
-            apiKey: "AIzaSyD-MockFirebaseKeyForRoleta12345",
-            authDomain: "roleta-app-cloud.firebaseapp.com",
-            projectId: "roleta-app-cloud",
-            storageBucket: "roleta-app-cloud.appspot.com",
-            messagingSenderId: "1234567890",
-            appId: "1:1234567890:web:abcdef123456"
+            apiKey: "AIzaSyCih_2uLEd3257YvHXY2dkQxymTqDTOd3M",
+            authDomain: "roleta-20f73.firebaseapp.com",
+            projectId: "roleta-20f73",
+            storageBucket: "roleta-20f73.firebasestorage.app",
+            messagingSenderId: "467195297348",
+            appId: "1:467195297348:web:46b066b463f721aeb50611",
+            measurementId: "G-NEZMEHLZ95"
         };
 
-        // Initialize Firebase if not already initialized
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
         }
         const dbCloud = firebase.firestore();
 
+        // --- Database & LocalStorage State Management ---
         const DB_KEY = "roleta_db_v1";
-        let cachedDB = null;
+        let isCloudSynced = false;
 
         function getInitialData() {
             return {
@@ -70,18 +69,21 @@
                     { id: 1, name: "Outubro Premiado", slug: "outubro", active: true }
                 ],
                 prizes: [
-                    { id: 1, campaignId: 1, name: "5% de Desconto", description: "Desconto em compras acima de R$ 50", displayText: "5%", resultText: "5% DE DESCONTO", discount: "5%", weight: 40, quantity: 500, unlimitedQuantity: false, active: true },
-                    { id: 2, campaignId: 1, name: "10% de Desconto", description: "Desconto em qualquer produto", displayText: "10%", resultText: "10% DE DESCONTO", discount: "10%", weight: 30, quantity: 200, unlimitedQuantity: false, active: true },
-                    { id: 3, campaignId: 1, name: "15% de Desconto", description: "Desconto especial de primavera", displayText: "15%", resultText: "15% DE DESCONTO", discount: "15%", weight: 20, quantity: 50, unlimitedQuantity: false, active: true },
-                    { id: 4, campaignId: 1, name: "20% de Desconto", description: "Super desconto exclusivo", displayText: "20%", resultText: "20% DE DESCONTO", discount: "20%", weight: 8, quantity: 20, unlimitedQuantity: false, active: true },
-                    { id: 5, campaignId: 1, name: "50% de Desconto", description: "Prêmio máximo da roleta!", displayText: "50%", resultText: "50% DE DESCONTO", discount: "50%", weight: 2, quantity: 5, unlimitedQuantity: false, active: true }
+                    { id: 1, campaignId: 1, name: "1 Mês Gratuito", description: "Acesso completo gratuito por 30 dias", displayText: "1 MÊS GRATUITO", resultText: "1 MÊS GRATUITO", discount: "1 Mês Grátis", weight: 10, quantity: 50, unlimitedQuantity: false, active: true },
+                    { id: 2, campaignId: 1, name: "R$ 15 de Desconto", description: "Desconto exclusivo de R$ 15", displayText: "R$ 15 DE DESCONTO", resultText: "R$ 15 DE DESCONTO", discount: "R$ 15", weight: 25, quantity: 200, unlimitedQuantity: false, active: true },
+                    { id: 3, campaignId: 1, name: "R$ 10 de Desconto", description: "Desconto exclusivo de R$ 10", displayText: "R$ 10 DE DESCONTO", resultText: "R$ 10 DE DESCONTO", discount: "R$ 10", weight: 30, quantity: 300, unlimitedQuantity: false, active: true },
+                    { id: 4, campaignId: 1, name: "R$ 5 de Desconto", description: "Desconto de R$ 5 para você aproveitar", displayText: "R$ 5 DE DESCONTO", resultText: "R$ 5 DE DESCONTO", discount: "R$ 5", weight: 40, quantity: 500, unlimitedQuantity: false, active: true },
+                    { id: 5, campaignId: 1, name: "R$ 20 de Desconto", description: "Super desconto de R$ 20 exclusivo", displayText: "R$ 20 DE DESCONTO", resultText: "R$ 20 DE DESCONTO", discount: "R$ 20", weight: 15, quantity: 100, unlimitedQuantity: false, active: true }
                 ],
                 codes: [
                     { id: 1, campaignId: 1, code: "RLT-7X92KP", status: "AVAILABLE", usedAt: null },
                     { id: 2, campaignId: 1, code: "RLT-4M8Q2A", status: "AVAILABLE", usedAt: null },
                     { id: 3, campaignId: 1, code: "RLT-9ZK31B", status: "AVAILABLE", usedAt: null },
                     { id: 4, campaignId: 1, code: "RLT-2P7X8M", status: "AVAILABLE", usedAt: null },
-                    { id: 5, campaignId: 1, code: "RLT-TEST01", status: "AVAILABLE", usedAt: null }
+                    { id: 5, campaignId: 1, code: "RLT-TEST01", status: "AVAILABLE", usedAt: null },
+                    { id: 6, campaignId: 1, code: "RLT-SORTE", status: "AVAILABLE", usedAt: null },
+                    { id: 7, campaignId: 1, code: "RLT-VIP10", status: "AVAILABLE", usedAt: null },
+                    { id: 8, campaignId: 1, code: "RLT-CLIENTE", status: "AVAILABLE", usedAt: null }
                 ],
                 spins: [],
                 settings: {
@@ -106,7 +108,6 @@
         }
 
         function loadDB() {
-            if (cachedDB) return cachedDB;
             const data = localStorage.getItem(DB_KEY);
             if (!data) {
                 const initial = getInitialData();
@@ -123,31 +124,38 @@
         }
 
         function saveDB(db) {
-            cachedDB = db;
             localStorage.setItem(DB_KEY, JSON.stringify(db));
-            // Sync to Firestore Cloud in background
-            dbCloud.collection("roletas").doc("main_config").set(db).catch(err => {
-                console.error("Cloud sync error:", err);
-            });
+            // Sync to Firestore in real-time
+            try {
+                dbCloud.collection("roletas").doc("config").set(db).catch(err => {
+                    console.warn("Firestore save error:", err);
+                });
+            } catch (e) {
+                console.warn("Firestore sync error:", e);
+            }
         }
 
-        // Listen to real-time updates from Firestore Cloud
-        dbCloud.collection("roletas").doc("main_config").onSnapshot(doc => {
-            if (doc.exists) {
-                const cloudData = doc.data();
-                if (cloudData && cloudData.campaigns) {
-                    cachedDB = cloudData;
-                    localStorage.setItem(DB_KEY, JSON.stringify(cloudData));
-                    router(); // Re-render view with latest cloud data
+        // Real-time synchronization from Firestore
+        try {
+            dbCloud.collection("roletas").doc("config").onSnapshot(doc => {
+                if (doc.exists) {
+                    const cloudData = doc.data();
+                    if (cloudData && cloudData.campaigns) {
+                        localStorage.setItem(DB_KEY, JSON.stringify(cloudData));
+                        isCloudSynced = true;
+                        router();
+                    }
+                } else {
+                    // Seed cloud with initial data
+                    const initial = loadDB();
+                    dbCloud.collection("roletas").doc("config").set(initial);
                 }
-            } else {
-                // Initialize cloud doc if not exists
-                const initial = loadDB();
-                dbCloud.collection("roletas").doc("main_config").set(initial);
-            }
-        }, err => {
-            console.error("Cloud listener error:", err);
-        });
+            }, err => {
+                console.warn("Firestore listener error:", err);
+            });
+        } catch (e) {
+            console.warn("Error setting up Firestore listener:", e);
+        }
 
         // --- Router & App State ---
         let currentCodeObj = null;
@@ -258,7 +266,7 @@
                                 <div class="space-y-3">
                                     <p class="text-emerald-400 font-bold text-sm bg-emerald-950/60 py-2.5 px-4 rounded-xl border border-emerald-500/40 shadow-md">${settings.valid_code_msg || 'Código validado!'}</p>
                                     <button onclick="spinWheel(${campaign.id})" id="spinBtn" class="w-full py-5 rounded-2xl font-black text-lg sm:text-xl gold-btn text-indigo-950 shadow-[0_8px_35px_rgba(250,204,21,0.8)] hover:scale-[1.02] active:scale-[0.98] transition uppercase tracking-wider flex items-center justify-center gap-3">
-                                        <span>${settings.spin_button || 'GIRAR ROLETA'}</span>
+                                        <span>${settings.spin_button || 'CLIQUE AQUI E GIRE A ROLETA'}</span>
                                         <i class="fa-solid fa-hand-pointer text-xl animate-bounce"></i>
                                     </button>
                                 </div>
@@ -294,7 +302,7 @@
             if (prizes.length === 0) return;
 
             const sliceAngle = (2 * Math.PI) / prizes.length;
-            const colors = ["#7C3AED", "#2563EB", "#059669", "#DB2777", "#EA580C", "#4F46E5", "#0D9488", "#CA8A04"];
+            const colors = ["#7C3AED", "#2563EB", "#059669", "#DB2777", "#EA580C"];
 
             ctx.save();
             ctx.translate(center, center);
@@ -322,9 +330,9 @@
                 ctx.textAlign = "right";
                 ctx.fillStyle = "#FFFFFF";
                 ctx.shadowColor = "rgba(0, 0, 0, 0.95)";
-                ctx.shadowBlur = 10;
-                ctx.font = "bold 15px sans-serif";
-                ctx.fillText(prize.displayText || prize.name, radius - 24, 6);
+                ctx.shadowBlur = 8;
+                ctx.font = "bold 14px sans-serif";
+                ctx.fillText(prize.displayText || prize.name, radius - 20, 5);
                 ctx.restore();
             });
 
@@ -441,16 +449,21 @@
             }, 5000);
         }
 
-        // --- Admin Panel ---
+        // --- Admin Panel (Clean, accessed via #admin) ---
         let adminTab = "campaigns";
 
         function renderAdmin(container, db) {
             container.innerHTML = `
                 <div class="flex-1 flex flex-col bg-slate-900 text-white min-h-screen">
                     <header class="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center">
-                        <h1 class="text-xl font-bold flex items-center gap-2">
-                            <i class="fa-solid fa-gauge-high text-yellow-400"></i> Painel Administrativo (Sincronizado na Nuvem Firebase)
-                        </h1>
+                        <div class="flex items-center gap-3">
+                            <h1 class="text-xl font-bold flex items-center gap-2">
+                                <i class="fa-solid fa-gauge-high text-yellow-400"></i> Painel Administrativo
+                            </h1>
+                            <span class="text-xs text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-2.5 py-1 rounded-full font-mono hidden sm:inline-flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Firebase Conectado (roleta-20f73)
+                            </span>
+                        </div>
                         <a href="#roleta/outubro" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 px-4 py-2 rounded-xl text-sm font-extrabold transition flex items-center gap-2 shadow-lg">
                             <i class="fa-solid fa-eye"></i> Ver Roleta Pública
                         </a>
@@ -680,7 +693,7 @@
         }
 
         function openNewPrizeModal(campaignId) {
-            const name = prompt("Nome do Prêmio / Frase (ex: Frete Grátis / R$ 20):", "Frete Grátis");
+            const name = prompt("Nome do Prêmio / Frase (ex: 10% de Desconto):", "10% de Desconto");
             if (!name) return;
             const displayText = prompt("Texto exibido na Fatia da Roleta:", name);
             const resultText = prompt("Texto exibido no Resultado (Celebração):", name.toUpperCase());

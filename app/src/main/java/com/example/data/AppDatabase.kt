@@ -148,41 +148,37 @@ abstract class AppDatabase : RoomDatabase() {
                     "RLT-4M8Q2A",
                     "RLT-9ZK31B",
                     "RLT-2P7X8M",
-                    "RLT-1ABC99",
                     "RLT-TEST01"
-                ).map { code ->
-                    AccessCodeEntity(
-                        campaignId = campaignId,
-                        code = code,
-                        status = "AVAILABLE"
+                )
+                sampleCodes.forEach { code ->
+                    codeDao.insertCode(
+                        AccessCodeEntity(
+                            campaignId = campaignId,
+                            code = code,
+                            status = "AVAILABLE"
+                        )
                     )
                 }
-                codeDao.insertCodes(sampleCodes)
 
                 // Default settings
                 val defaultSettings = mapOf(
-                    "title" to "Gire e Ganhe!",
-                    "subtitle" to "Você tem uma chance de ganhar um desconto exclusivo.",
+                    "title" to "ROLETA DA SORTE",
+                    "subtitle" to "Gire a roleta e ganhe descontos e benefícios incríveis!",
                     "code_placeholder" to "Digite seu código (ex: RLT-7X92KP)",
                     "liberate_button" to "LIBERAR ROLETA",
-                    "valid_code_msg" to "Código validado com sucesso!",
-                    "spin_count_msg" to "Você tem 1 giro disponível.",
-                    "spin_button" to "GIRAR AGORA",
-                    "spinning_msg" to "Girando roleta...",
+                    "spin_button" to "CLIQUE AQUI E GIRE A ROLETA",
                     "result_title" to "🎉 PARABÉNS! 🎉",
-                    "result_prize_prefix" to "VOCÊ GANHOU",
-                    "result_success_msg" to "Seu prêmio foi registrado com sucesso no sistema.",
-                    "bg_color" to "#0F172A",
+                    "bg_color" to "#0B0F19",
                     "text_color" to "#FFFFFF",
-                    "btn_color" to "#10B981",
-                    "btn_text_color" to "#FFFFFF",
-                    "wheel_color" to "#1E293B",
-                    "pointer_color" to "#EF4444"
+                    "btn_color" to "#FACC15"
                 )
-
-                for ((k, v) in defaultSettings) {
+                defaultSettings.forEach { (key, value) ->
                     settingDao.insertOrUpdateSetting(
-                        SettingEntity(campaignId = campaignId, key = k, value = v)
+                        SettingEntity(
+                            campaignId = campaignId,
+                            key = key,
+                            value = value
+                        )
                     )
                 }
             }

@@ -49,7 +49,6 @@
                 try {
                     const decodedDB = JSON.parse(atob(stateParam));
                     localStorage.setItem(DB_KEY, JSON.stringify(decodedDB));
-                    // Clean URL without losing hash
                     window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
                 } catch (e) {
                     console.error("Error parsing shared state", e);
@@ -152,6 +151,9 @@
                         <div class="bg-slate-900 p-8 rounded-2xl shadow-xl max-w-md w-full border border-slate-800">
                             <h1 class="text-2xl font-bold text-red-500 mb-2">Campanha Indisponível</h1>
                             <p class="text-slate-400">Esta campanha de prêmios está encerrada ou não existe.</p>
+                            <div class="mt-6">
+                                <a href="#admin" class="text-yellow-400 underline font-bold">Ir para o Painel Administrativo</a>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -163,9 +165,14 @@
 
             container.innerHTML = `
                 <div class="flex-1 flex flex-col items-center justify-center p-4 relative" style="background-color: ${settings.bg_color}; color: ${settings.text_color};">
+                    <div class="absolute top-4 right-4 z-40">
+                        <a href="#admin" class="bg-slate-800/80 hover:bg-slate-700 text-yellow-400 px-3 py-1.5 rounded-xl text-xs font-bold border border-yellow-500/30 backdrop-blur-md shadow-lg flex items-center gap-1.5">
+                            <i class="fa-solid fa-gear"></i> Admin
+                        </a>
+                    </div>
+
                     <div class="max-w-md w-full text-center px-4 py-6 flex flex-col items-center">
-                        
-                        <!-- Header Title matching reference image -->
+                        <!-- Header Title -->
                         <div class="mb-4 text-center">
                             <h2 class="text-xs font-extrabold tracking-[0.4em] text-white uppercase opacity-90">ROLETA DA</h2>
                             <h1 class="text-4xl sm:text-5xl font-black tracking-wider gold-text uppercase flex items-center justify-center gap-2">
@@ -176,9 +183,7 @@
 
                         <!-- Wheel Container with Casino Glowing Rim & Bulbs -->
                         <div class="relative w-80 h-80 sm:w-88 sm:h-88 mx-auto mb-6 flex items-center justify-center">
-                            <!-- Outer Casino Rim with Bulbs -->
                             <div class="absolute inset-0 rounded-full casino-rim p-5 flex items-center justify-center shadow-[0_0_80px_rgba(234,179,8,0.8)]">
-                                <!-- Glowing Light Bulbs Around Rim -->
                                 <div class="absolute inset-2 rounded-full border-2 border-dashed border-yellow-100/60 pointer-events-none"></div>
                                 <div class="absolute top-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-white rounded-full casino-bulb shadow-[0_0_8px_#FFF]"></div>
                                 <div class="absolute bottom-1 left-1/2 -translate-x-1/2 w-3 h-3 bg-white rounded-full casino-bulb shadow-[0_0_8px_#FFF]" style="animation-delay: 0.3s;"></div>
@@ -189,20 +194,17 @@
                                 <div class="absolute bottom-6 left-6 w-2.5 h-2.5 bg-white rounded-full casino-bulb shadow-[0_0_6px_#FFF]" style="animation-delay: 0.7s;"></div>
                                 <div class="absolute bottom-6 right-6 w-2.5 h-2.5 bg-white rounded-full casino-bulb shadow-[0_0_6px_#FFF]" style="animation-delay: 0.4s;"></div>
 
-                                <!-- Inner Wheel Background -->
                                 <div class="w-full h-full rounded-full bg-slate-950 relative flex items-center justify-center overflow-hidden border-2 border-yellow-400 shadow-inner">
                                     <canvas id="wheelCanvas" width="320" height="320" class="w-full h-full rounded-full transition-transform duration-[5000ms] cubic-bezier(0.15, 0, 0.15, 1)"></canvas>
                                 </div>
                             </div>
 
-                            <!-- Center Gold Cap with Star -->
                             <div class="absolute w-16 h-16 rounded-full bg-gradient-to-tr from-yellow-700 via-yellow-400 to-yellow-200 shadow-2xl flex items-center justify-center border-4 border-yellow-100 z-20">
                                 <div class="w-10 h-10 rounded-full bg-slate-950 flex items-center justify-center shadow-inner">
                                     <i class="fa-solid fa-star text-yellow-400 text-xl"></i>
                                 </div>
                             </div>
 
-                            <!-- Top Casino Pointer -->
                             <div class="absolute -top-3 w-10 h-11 bg-gradient-to-b from-red-500 via-red-600 to-red-900 shadow-[0_5px_15px_rgba(0,0,0,0.8)] rounded-b-xl flex items-center justify-center border-2 border-yellow-300 z-30">
                                 <div class="w-4 h-4 bg-yellow-300 rounded-full shadow-[0_0_10px_#FDE047] mb-2"></div>
                             </div>
@@ -422,17 +424,18 @@
                         </a>
                     </header>
 
-                    <!-- Shareable Link Banner -->
-                    <div class="bg-gradient-to-r from-yellow-600/30 to-amber-600/30 border-b border-yellow-500/30 p-4 px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-                        <div>
+                    <!-- Shareable Link Banner with Textarea / Input for Easy Copying -->
+                    <div class="bg-gradient-to-r from-yellow-600/30 to-amber-600/30 border-b border-yellow-500/30 p-5 px-6 flex flex-col gap-3">
+                        <div class="flex justify-between items-center">
                             <h3 class="font-bold text-yellow-400 text-sm flex items-center gap-2">
-                                <i class="fa-solid fa-share-nodes"></i> Link com Configurações Atuais para Clientes
+                                <i class="fa-solid fa-share-nodes"></i> Link com Configuração Atual para Clientes
                             </h3>
-                            <p class="text-xs text-slate-300 mt-0.5">Envie este link para seus clientes para que eles abram exatamente os prêmios e configurações que você criou.</p>
+                            <button onclick="navigator.clipboard.writeText(document.getElementById('shareLinkInput').value); alert('Link copiado com sucesso!');" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-black px-4 py-2 rounded-xl text-xs uppercase tracking-wider shadow-lg flex items-center gap-2">
+                                <i class="fa-solid fa-copy"></i> Copiar Link
+                            </button>
                         </div>
-                        <button onclick="navigator.clipboard.writeText('${shareableUrl}'); alert('Link com a configuração atual copiado para a área de transferência!');" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-black px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider shadow-lg flex items-center gap-2 whitespace-nowrap">
-                            <i class="fa-solid fa-copy"></i> Copiar Link Compartilhável
-                        </button>
+                        <p class="text-xs text-slate-300">Copie o link abaixo e envie para seu cliente. Ele abrirá a roleta com exatamente todos os prêmios e configurações que você cadastrou:</p>
+                        <input type="text" id="shareLinkInput" readonly value="${shareableUrl}" onclick="this.select()" class="w-full bg-slate-950 border border-yellow-500/40 px-4 py-3 rounded-xl text-xs text-yellow-300 font-mono select-all">
                     </div>
 
                     <div class="bg-slate-900 border-b border-slate-800 flex overflow-x-auto px-4 gap-2">

@@ -38,8 +38,24 @@
     </div>
 
     <script>
-        // --- Database & LocalStorage State Management ---
+        // --- Database & LocalStorage State Management with URL State Sync ---
         const DB_KEY = "roleta_db_v1";
+
+        // Check if URL contains shared state from admin
+        (function checkUrlState() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const stateParam = urlParams.get('state');
+            if (stateParam) {
+                try {
+                    const decodedDB = JSON.parse(atob(stateParam));
+                    localStorage.setItem(DB_KEY, JSON.stringify(decodedDB));
+                    // Clean URL without losing hash
+                    window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+                } catch (e) {
+                    console.error("Error parsing shared state", e);
+                }
+            }
+        })();
 
         function getInitialData() {
             return {
@@ -392,6 +408,9 @@
         let adminTab = "campaigns";
 
         function renderAdmin(container, db) {
+            const stateJson = btoa(JSON.stringify(db));
+            const shareableUrl = window.location.origin + window.location.pathname + "?state=" + encodeURIComponent(stateJson) + "#roleta/outubro";
+
             container.innerHTML = `
                 <div class="flex-1 flex flex-col bg-slate-900 text-white min-h-screen">
                     <header class="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center">
@@ -402,6 +421,19 @@
                             <i class="fa-solid fa-eye"></i> Ver Roleta Pública
                         </a>
                     </header>
+
+                    <!-- Shareable Link Banner -->
+                    <div class="bg-gradient-to-r from-yellow-600/30 to-amber-600/30 border-b border-yellow-500/30 p-4 px-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+                        <div>
+                            <h3 class="font-bold text-yellow-400 text-sm flex items-center gap-2">
+                                <i class="fa-solid fa-share-nodes"></i> Link com Configurações Atuais para Clientes
+                            </h3>
+                            <p class="text-xs text-slate-300 mt-0.5">Envie este link para seus clientes para que eles abram exatamente os prêmios e configurações que você criou.</p>
+                        </div>
+                        <button onclick="navigator.clipboard.writeText('${shareableUrl}'); alert('Link com a configuração atual copiado para a área de transferência!');" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-black px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider shadow-lg flex items-center gap-2 whitespace-nowrap">
+                            <i class="fa-solid fa-copy"></i> Copiar Link Compartilhável
+                        </button>
+                    </div>
 
                     <div class="bg-slate-900 border-b border-slate-800 flex overflow-x-auto px-4 gap-2">
                         <button onclick="setAdminTab('campaigns')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'campaigns' ? 'border-yellow-400 text-yellow-400' : 'border-transparent text-slate-400'}">Campanhas</button>
@@ -738,7 +770,7 @@
         function exportCodesCSV() {
             const db = loadDB();
             let csv = "Codigo,Status,DataUtilizacao\n";
-            db.codes.codes.forEach(c => {
+            db.codes.forEach(c => {
                 csv += `${c.code},${c.status},${c.usedAt ? new Date(c.usedAt).toISOString() : ''}\n`;
             });
             downloadCSV(csv, "codigos_roleta.csv");

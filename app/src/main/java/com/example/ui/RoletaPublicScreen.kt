@@ -56,7 +56,6 @@ fun RoletaPublicScreen(
     var codeInput by remember { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
     val rotationAnim = remember { Animatable(0f) }
-    var targetRotation by remember { mutableStateOf(0f) }
 
     val activePrizes = prizes.filter { it.active && (it.unlimitedQuantity || it.quantity > 0) }
     val scrollState = rememberScrollState()
@@ -66,7 +65,7 @@ fun RoletaPublicScreen(
             .fillMaxSize()
             .background(Color(0xFF0B0F19))
     ) {
-        // Background poster matching the reference image exactly
+        // Background poster matching reference image
         Image(
             painter = painterResource(id = R.drawable.roleta_poster),
             contentDescription = "Roleta da Sorte Poster",
@@ -93,7 +92,7 @@ fun RoletaPublicScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Spacer(modifier = Modifier.height(250.dp)) // Space for poster header
+            Spacer(modifier = Modifier.height(250.dp))
 
             // Gorgeous Casino Wheel with Golden Rim, Glowing Bulbs, and Spinning Slices
             Box(
@@ -109,7 +108,6 @@ fun RoletaPublicScreen(
                     .shadow(30.dp, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                // Inner Wheel Container
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -143,7 +141,6 @@ fun RoletaPublicScreen(
                                 useCenter = true
                             )
 
-                            // Draw slice border line
                             drawArc(
                                 color = Color(0xFFFDE047),
                                 startAngle = startAngle,
@@ -172,7 +169,7 @@ fun RoletaPublicScreen(
                     }
                 }
 
-                // Center Gold Cap with Clover
+                // Center Gold Cap with Star
                 Box(
                     modifier = Modifier
                         .size(56.dp)
@@ -225,7 +222,7 @@ fun RoletaPublicScreen(
 
             Spacer(modifier = Modifier.height(30.dp))
 
-            // Interaction Area (Inputs / Buttons matching poster)
+            // Interaction Area
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -313,9 +310,15 @@ fun RoletaPublicScreen(
                                     coroutineScope.launch {
                                         val sliceCount = if (activePrizes.isEmpty()) 1 else activePrizes.size
                                         val degreesPerSlice = 360f / sliceCount
-                                        val extraSpins = 360f * 6
-                                        val targetSliceAngle = prizeIndex * degreesPerSlice + (degreesPerSlice / 2)
-                                        targetRotation = rotationAnim.value + extraSpins + (360f - (rotationAnim.value % 360f)) - targetSliceAngle
+                                        
+                                        // Precise alignment math: top pointer is at 270 degrees
+                                        val targetSliceCenterAngle = prizeIndex * degreesPerSlice + (degreesPerSlice / 2f)
+                                        val desiredMod = (270f - targetSliceCenterAngle + 360f) % 360f
+                                        val currentMod = rotationAnim.value % 360f
+                                        var diff = desiredMod - currentMod
+                                        if (diff < 0) diff += 360f
+
+                                        val targetRotation = rotationAnim.value + (360f * 6) + diff
 
                                         rotationAnim.animateTo(
                                             targetValue = targetRotation,

@@ -106,6 +106,7 @@
         let currentCodeObj = null;
         let isSpinning = false;
         let lastWonPrize = null;
+        let currentRotation = 0;
 
         function router() {
             const hash = window.location.hash;
@@ -178,10 +179,10 @@
                                 </div>
                             </div>
 
-                            <!-- Center Gold Cap with Clover/Star -->
+                            <!-- Center Gold Cap with Star -->
                             <div class="absolute w-16 h-16 rounded-full bg-gradient-to-tr from-yellow-700 via-yellow-400 to-yellow-200 shadow-2xl flex items-center justify-center border-4 border-yellow-100 z-20">
                                 <div class="w-10 h-10 rounded-full bg-slate-950 flex items-center justify-center shadow-inner">
-                                    <i class="fa-solid fa-clover text-yellow-400 text-xl"></i>
+                                    <i class="fa-solid fa-star text-yellow-400 text-xl"></i>
                                 </div>
                             </div>
 
@@ -224,7 +225,7 @@
                 </div>
             `;
 
-            drawWheel(prizes, 0);
+            drawWheel(prizes, currentRotation);
         }
 
         function drawWheel(prizes, rotationAngle) {
@@ -241,12 +242,11 @@
             if (prizes.length === 0) return;
 
             const sliceAngle = (2 * Math.PI) / prizes.length;
-            // Rich casino palette matching reference image: Purple, Blue, Green, Pink, Orange
             const colors = ["#7C3AED", "#2563EB", "#059669", "#DB2777", "#EA580C", "#4F46E5", "#0D9488", "#CA8A04"];
 
             ctx.save();
             ctx.translate(center, center);
-            ctx.rotate(rotationAngle);
+            ctx.rotate(rotationAngle * Math.PI / 180);
             ctx.translate(-center, -center);
 
             prizes.forEach((prize, i) => {
@@ -264,7 +264,6 @@
                 ctx.lineWidth = 3;
                 ctx.stroke();
 
-                // Draw text
                 ctx.save();
                 ctx.translate(center, center);
                 ctx.rotate(startAngle + sliceAngle / 2);
@@ -367,8 +366,15 @@
             saveDB(db);
 
             const prizeIndex = prizes.findIndex(p => p.id === selectedPrize.id);
-            const sliceAngle = 360 / prizes.length;
-            const targetAngle = 360 * 6 + (360 - (prizeIndex * sliceAngle + sliceAngle / 2));
+            const sliceAngleDeg = 360 / prizes.length;
+            const targetSliceCenterAngle = prizeIndex * sliceAngleDeg + (sliceAngleDeg / 2);
+            const desiredMod = (270 - targetSliceCenterAngle + 360) % 360;
+            const currentMod = currentRotation % 360;
+            let diff = desiredMod - currentMod;
+            if (diff < 0) diff += 360;
+
+            const targetAngle = currentRotation + (360 * 6) + diff;
+            currentRotation = targetAngle;
 
             const canvas = document.getElementById("wheelCanvas");
             if (canvas) {

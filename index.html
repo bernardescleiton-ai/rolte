@@ -6,6 +6,11 @@
     <title>Roleta da Sorte</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
     <style>
         .gold-text {
             background: linear-gradient(180deg, #FFFDF0 0%, #FDE047 50%, #CA8A04 100%);
@@ -34,12 +39,30 @@
 
     <!-- App Container -->
     <div id="app" class="flex-1 flex flex-col relative z-10">
-        <!-- Rendered dynamically by JS -->
+        <div class="flex-1 flex items-center justify-center p-6 text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-yellow-400 mx-auto"></div>
+        </div>
     </div>
 
     <script>
-        // --- Database & LocalStorage State Management ---
+        // --- Firebase Initialization & Firestore Sync ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyD-MockFirebaseKeyForRoleta12345",
+            authDomain: "roleta-app-cloud.firebaseapp.com",
+            projectId: "roleta-app-cloud",
+            storageBucket: "roleta-app-cloud.appspot.com",
+            messagingSenderId: "1234567890",
+            appId: "1:1234567890:web:abcdef123456"
+        };
+
+        // Initialize Firebase if not already initialized
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const dbCloud = firebase.firestore();
+
         const DB_KEY = "roleta_db_v1";
+        let cachedDB = null;
 
         function getInitialData() {
             return {
@@ -83,6 +106,7 @@
         }
 
         function loadDB() {
+            if (cachedDB) return cachedDB;
             const data = localStorage.getItem(DB_KEY);
             if (!data) {
                 const initial = getInitialData();
@@ -99,8 +123,31 @@
         }
 
         function saveDB(db) {
+            cachedDB = db;
             localStorage.setItem(DB_KEY, JSON.stringify(db));
+            // Sync to Firestore Cloud in background
+            dbCloud.collection("roletas").doc("main_config").set(db).catch(err => {
+                console.error("Cloud sync error:", err);
+            });
         }
+
+        // Listen to real-time updates from Firestore Cloud
+        dbCloud.collection("roletas").doc("main_config").onSnapshot(doc => {
+            if (doc.exists) {
+                const cloudData = doc.data();
+                if (cloudData && cloudData.campaigns) {
+                    cachedDB = cloudData;
+                    localStorage.setItem(DB_KEY, JSON.stringify(cloudData));
+                    router(); // Re-render view with latest cloud data
+                }
+            } else {
+                // Initialize cloud doc if not exists
+                const initial = loadDB();
+                dbCloud.collection("roletas").doc("main_config").set(initial);
+            }
+        }, err => {
+            console.error("Cloud listener error:", err);
+        });
 
         // --- Router & App State ---
         let currentCodeObj = null;
@@ -121,7 +168,7 @@
                     if (hash.startsWith("#roleta/")) {
                         slug = hash.replace("#roleta/", "");
                     }
-                    const campaign = db.campaigns.find(c => c.slug === slug) || db.campaigns[0];
+                    const campaign = (db.campaigns || []).find(c => c.slug === slug) || (db.campaigns || [])[0];
                     renderPublicRoleta(app, db, campaign);
                 }
             } catch (e) {
@@ -147,11 +194,11 @@
                 return;
             }
 
-            const settings = db.settings[campaign.id] || db.settings[1];
-            const prizes = db.prizes.filter(p => p.campaignId === campaign.id && p.active && (p.unlimitedQuantity || p.quantity > 0));
+            const settings = (db.settings || {})[campaign.id] || (db.settings || {})[1] || {};
+            const prizes = (db.prizes || []).filter(p => p.campaignId === campaign.id && p.active && (p.unlimitedQuantity || p.quantity > 0));
 
             container.innerHTML = `
-                <div class="flex-1 flex flex-col items-center justify-center p-4 relative" style="background-color: ${settings.bg_color}; color: ${settings.text_color};">
+                <div class="flex-1 flex flex-col items-center justify-center p-4 relative" style="background-color: ${settings.bg_color || '#060913'}; color: ${settings.text_color || '#FFFFFF'};">
                     <div class="max-w-md w-full text-center px-4 py-6 flex flex-col items-center">
                         
                         <!-- Header Title matching reference image -->
@@ -160,7 +207,7 @@
                             <h1 class="text-4xl sm:text-5xl font-black tracking-wider gold-text uppercase flex items-center justify-center gap-2">
                                 SORTE <i class="fa-solid fa-clover text-yellow-400 text-3xl"></i>
                             </h1>
-                            <p class="text-xs sm:text-sm font-semibold text-yellow-100/90 mt-2 max-w-xs mx-auto">${settings.subtitle}</p>
+                            <p class="text-xs sm:text-sm font-semibold text-yellow-100/90 mt-2 max-w-xs mx-auto">${settings.subtitle || ''}</p>
                         </div>
 
                         <!-- Wheel Container with Casino Glowing Rim & Bulbs -->
@@ -201,27 +248,27 @@
                         <div id="interactionArea" class="w-full">
                             ${!currentCodeObj ? `
                                 <div class="space-y-4 bg-slate-900/95 backdrop-blur-md p-6 rounded-3xl border border-yellow-500/40 shadow-2xl">
-                                    <input type="text" id="codeInput" placeholder="${settings.code_placeholder}" class="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-yellow-400 text-center font-bold tracking-wider uppercase text-sm shadow-inner">
+                                    <input type="text" id="codeInput" placeholder="${settings.code_placeholder || 'Digite seu código'}" class="w-full px-4 py-3.5 rounded-2xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-yellow-400 text-center font-bold tracking-wider uppercase text-sm shadow-inner">
                                     <button onclick="validateCode(${campaign.id})" class="w-full py-4 rounded-2xl font-black text-base gold-btn text-indigo-950 hover:scale-[1.02] active:scale-[0.98] transition uppercase tracking-wider shadow-lg">
-                                        ${settings.liberate_button}
+                                        ${settings.liberate_button || 'LIBERAR ROLETA'}
                                     </button>
                                     <div id="codeError" class="text-red-400 text-xs font-semibold"></div>
                                 </div>
                             ` : !lastWonPrize ? `
                                 <div class="space-y-3">
-                                    <p class="text-emerald-400 font-bold text-sm bg-emerald-950/60 py-2.5 px-4 rounded-xl border border-emerald-500/40 shadow-md">${settings.valid_code_msg}</p>
+                                    <p class="text-emerald-400 font-bold text-sm bg-emerald-950/60 py-2.5 px-4 rounded-xl border border-emerald-500/40 shadow-md">${settings.valid_code_msg || 'Código validado!'}</p>
                                     <button onclick="spinWheel(${campaign.id})" id="spinBtn" class="w-full py-5 rounded-2xl font-black text-lg sm:text-xl gold-btn text-indigo-950 shadow-[0_8px_35px_rgba(250,204,21,0.8)] hover:scale-[1.02] active:scale-[0.98] transition uppercase tracking-wider flex items-center justify-center gap-3">
-                                        <span>${settings.spin_button}</span>
+                                        <span>${settings.spin_button || 'GIRAR ROLETA'}</span>
                                         <i class="fa-solid fa-hand-pointer text-xl animate-bounce"></i>
                                     </button>
                                 </div>
                             ` : `
                                 <div class="bg-slate-900/95 border border-yellow-500/60 p-6 rounded-3xl shadow-2xl space-y-3 backdrop-blur-md">
-                                    <h2 class="text-2xl font-black text-yellow-400">${settings.result_title}</h2>
-                                    <p class="text-xs uppercase tracking-widest text-slate-400">${settings.result_prize_prefix}</p>
+                                    <h2 class="text-2xl font-black text-yellow-400">${settings.result_title || 'PARABÉNS!'}</h2>
+                                    <p class="text-xs uppercase tracking-widest text-slate-400">${settings.result_prize_prefix || 'VOCÊ GANHOU'}</p>
                                     <div class="text-3xl font-black text-white drop-shadow-[0_2px_8px_rgba(251,191,36,0.7)]">${lastWonPrize.resultText || lastWonPrize.name}</div>
                                     <p class="text-sm text-slate-300">${lastWonPrize.description}</p>
-                                    <p class="text-xs text-yellow-400/80 mt-2 font-medium">${settings.result_success_msg}</p>
+                                    <p class="text-xs text-yellow-400/80 mt-2 font-medium">${settings.result_success_msg || ''}</p>
                                     <button onclick="location.reload()" class="mt-4 px-6 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-yellow-400 font-bold text-xs uppercase tracking-wider transition shadow-md">Girar Novamente</button>
                                 </div>
                             `}
@@ -294,7 +341,7 @@
                 return;
             }
 
-            const codeObj = db.codes.find(c => c.campaignId === campaignId && c.code === input);
+            const codeObj = (db.codes || []).find(c => c.campaignId === campaignId && c.code === input);
             if (!codeObj) {
                 errDiv.innerText = "Código inválido.";
                 return;
@@ -320,7 +367,7 @@
             isSpinning = true;
 
             const db = loadDB();
-            const prizes = db.prizes.filter(p => p.campaignId === campaignId && p.active && (p.unlimitedQuantity || p.quantity > 0));
+            const prizes = (db.prizes || []).filter(p => p.campaignId === campaignId && p.active && (p.unlimitedQuantity || p.quantity > 0));
 
             if (prizes.length === 0) {
                 alert("Nenhum prêmio disponível.");
@@ -367,6 +414,7 @@
                 discountSnapshot: selectedPrize.discount,
                 createdAt: Date.now()
             };
+            if (!db.spins) db.spins = [];
             db.spins.unshift(newSpin);
             saveDB(db);
 
@@ -393,7 +441,7 @@
             }, 5000);
         }
 
-        // --- Admin Panel (Clean, no shareable link box) ---
+        // --- Admin Panel ---
         let adminTab = "campaigns";
 
         function renderAdmin(container, db) {
@@ -401,7 +449,7 @@
                 <div class="flex-1 flex flex-col bg-slate-900 text-white min-h-screen">
                     <header class="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center">
                         <h1 class="text-xl font-bold flex items-center gap-2">
-                            <i class="fa-solid fa-gauge-high text-yellow-400"></i> Painel Administrativo
+                            <i class="fa-solid fa-gauge-high text-yellow-400"></i> Painel Administrativo (Sincronizado na Nuvem Firebase)
                         </h1>
                         <a href="#roleta/outubro" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 px-4 py-2 rounded-xl text-sm font-extrabold transition flex items-center gap-2 shadow-lg">
                             <i class="fa-solid fa-eye"></i> Ver Roleta Pública

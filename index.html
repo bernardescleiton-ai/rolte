@@ -25,9 +25,9 @@
                 ],
                 prizes: [
                     { id: 1, campaignId: 1, name: "R$ 5 de Desconto", description: "Desconto em compras acima de R$ 50", displayText: "R$ 5", resultText: "R$ 5 DE DESCONTO", discount: "R$ 5", weight: 40, quantity: 500, unlimitedQuantity: false, active: true },
-                    { id: 2, campaignId: 1, name: "R$ 10 de Desconto", description: "Desconto em qualquer produto", displayText: "R$ 10", resultText: "R$ 10 DE DESCONTO", discount: "R$ 10", weight: 30, quantity: 200, unlimitedQuantity: false, active: true },
-                    { id: 3, campaignId: 1, name: "R$ 20 de Desconto", description: "Desconto especial", displayText: "R$ 20", resultText: "R$ 20 DE DESCONTO", discount: "R$ 20", weight: 20, quantity: 50, unlimitedQuantity: false, active: true },
-                    { id: 4, campaignId: 1, name: "R$ 50 de Desconto", description: "Super desconto exclusivo", displayText: "R$ 50", resultText: "R$ 50 DE DESCONTO", discount: "R$ 50", weight: 8, quantity: 20, unlimitedQuantity: false, active: true },
+                    { id: 2, campaignId: 1, name: "Frete Grátis", description: "Frete grátis para todo o Brasil", displayText: "Frete Grátis", resultText: "FRETE GRÁTIS", discount: "Frete Grátis", weight: 30, quantity: 200, unlimitedQuantity: false, active: true },
+                    { id: 3, campaignId: 1, name: "R$ 20 de Desconto", description: "Desconto especial em qualquer produto", displayText: "R$ 20", resultText: "R$ 20 DE DESCONTO", discount: "R$ 20", weight: 20, quantity: 50, unlimitedQuantity: false, active: true },
+                    { id: 4, campaignId: 1, name: "Brinde Surpresa", description: "Um brinde exclusivo no seu pedido", displayText: "Brinde", resultText: "BRINDE SURPRESA", discount: "Brinde", weight: 8, quantity: 20, unlimitedQuantity: false, active: true },
                     { id: 5, campaignId: 1, name: "R$ 100 de Desconto", description: "Prêmio máximo da roleta!", displayText: "R$ 100", resultText: "R$ 100 DE DESCONTO", discount: "R$ 100", weight: 2, quantity: 5, unlimitedQuantity: false, active: true }
                 ],
                 codes: [
@@ -41,7 +41,7 @@
                 settings: {
                     1: {
                         title: "Gire e Ganhe!",
-                        subtitle: "Você tem uma chance de ganhar um desconto exclusivo.",
+                        subtitle: "Você tem uma chance de ganhar um prêmio exclusivo.",
                         code_placeholder: "Digite seu código (ex: RLT-7X92KP)",
                         liberate_button: "LIBERAR ROLETA",
                         valid_code_msg: "Código validado com sucesso!",
@@ -67,13 +67,7 @@
                 return initial;
             }
             try {
-                const db = JSON.parse(data);
-                if (db.prizes && db.prizes.length > 0 && db.prizes[0].name.includes("%")) {
-                    const initial = getInitialData();
-                    db.prizes = initial.prizes;
-                    saveDB(db);
-                }
-                return db;
+                return JSON.parse(data);
             } catch (e) {
                 const initial = getInitialData();
                 saveDB(initial);
@@ -217,8 +211,8 @@
                 ctx.rotate(startAngle + sliceAngle / 2);
                 ctx.textAlign = "right";
                 ctx.fillStyle = "#FFFFFF";
-                ctx.font = "bold 13px sans-serif";
-                ctx.fillText(prize.displayText || prize.name, radius - 15, 5);
+                ctx.font = "bold 12px sans-serif";
+                ctx.fillText(prize.displayText || prize.name, radius - 15, 4);
                 ctx.restore();
             });
 
@@ -344,7 +338,7 @@
 
                     <div class="bg-slate-900 border-b border-slate-800 flex overflow-x-auto px-4 gap-2">
                         <button onclick="setAdminTab('campaigns')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'campaigns' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400'}">Campanhas</button>
-                        <button onclick="setAdminTab('prizes')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'prizes' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400'}">Prêmios</button>
+                        <button onclick="setAdminTab('prizes')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'prizes' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400'}">Prêmios & Frases</button>
                         <button onclick="setAdminTab('codes')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'codes' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400'}">Códigos</button>
                         <button onclick="setAdminTab('results')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'results' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400'}">Resultados</button>
                         <button onclick="setAdminTab('settings')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'settings' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400'}">Configurações</button>
@@ -378,6 +372,7 @@
                                         <p class="text-sm text-emerald-400">Link: <a href="#roleta/${c.slug}" class="underline">/#roleta/${c.slug}</a></p>
                                     </div>
                                     <div class="flex items-center gap-3">
+                                        <button onclick="editCampaign(${c.id})" class="text-blue-400 hover:text-blue-300 p-2"><i class="fa-solid fa-pen"></i></button>
                                         <span class="px-3 py-1 rounded-full text-xs font-bold ${c.active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}">${c.active ? 'Ativa' : 'Inativa'}</span>
                                         <button onclick="deleteCampaign(${c.id})" class="text-red-400 hover:text-red-300 p-2"><i class="fa-solid fa-trash"></i></button>
                                     </div>
@@ -394,8 +389,8 @@
                 return `
                     <div class="space-y-6">
                         <div class="flex justify-between items-center">
-                            <h2 class="text-2xl font-bold">Prêmios (${activeCamp.name})</h2>
-                            <button onclick="openNewPrizeModal(${activeCamp.id})" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl font-bold text-sm">+ Adicionar Prêmio</button>
+                            <h2 class="text-2xl font-bold">Prêmios & Frases (${activeCamp.name})</h2>
+                            <button onclick="openNewPrizeModal(${activeCamp.id})" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl font-bold text-sm">+ Adicionar Prêmio / Frase</button>
                         </div>
                         <div class="grid gap-4">
                             ${prizes.map(p => {
@@ -404,10 +399,11 @@
                                     <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex justify-between items-center">
                                         <div>
                                             <h3 class="font-bold text-lg">${p.name}</h3>
-                                            <p class="text-sm text-slate-400">Valor: ${p.discount} | Peso: ${p.weight} | Probabilidade: <span class="text-emerald-400 font-bold">${prob}%</span></p>
+                                            <p class="text-sm text-slate-300">Texto na Roleta: <span class="font-semibold text-emerald-400">"${p.displayText}"</span> | Peso: ${p.weight} | Probabilidade: <span class="text-emerald-400 font-bold">${prob}%</span></p>
                                             <p class="text-xs text-slate-500">Estoque: ${p.unlimitedQuantity ? 'Ilimitado' : p.quantity}</p>
                                         </div>
                                         <div class="flex items-center gap-3">
+                                            <button onclick="editPrize(${p.id})" class="text-blue-400 hover:text-blue-300 p-2" title="Editar Prêmio"><i class="fa-solid fa-pen"></i></button>
                                             <button onclick="togglePrize(${p.id})" class="px-3 py-1 rounded-full text-xs font-bold ${p.active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'}">${p.active ? 'Ativo' : 'Inativo'}</button>
                                             <button onclick="deletePrize(${p.id})" class="text-red-400 hover:text-red-300 p-2"><i class="fa-solid fa-trash"></i></button>
                                         </div>
@@ -534,6 +530,22 @@
             router();
         }
 
+        function editCampaign(id) {
+            const db = loadDB();
+            const c = db.campaigns.find(x => x.id === id);
+            if (!c) return;
+
+            const name = prompt("Nome da Campanha:", c.name);
+            if (name === null) return;
+            const slug = prompt("Slug da URL:", c.slug);
+            if (slug === null) return;
+
+            c.name = name;
+            c.slug = slug;
+            saveDB(db);
+            router();
+        }
+
         function deleteCampaign(id) {
             const db = loadDB();
             db.campaigns = db.campaigns.filter(c => c.id !== id);
@@ -542,10 +554,11 @@
         }
 
         function openNewPrizeModal(campaignId) {
-            const name = prompt("Nome do Prêmio (ex: R$ 20 de Desconto):", "R$ 20 de Desconto");
+            const name = prompt("Nome do Prêmio / Frase (ex: Frete Grátis / R$ 20):", "Frete Grátis");
             if (!name) return;
-            const discount = prompt("Valor do Desconto (ex: R$ 20):", "R$ 20");
-            const weight = parseInt(prompt("Peso (ex: 15):", "15")) || 10;
+            const displayText = prompt("Texto exibido na Fatia da Roleta:", name);
+            const resultText = prompt("Texto exibido no Resultado (Celebração):", name.toUpperCase());
+            const weight = parseInt(prompt("Peso (probabilidade):", "15")) || 10;
             const quantity = parseInt(prompt("Quantidade em estoque:", "100")) || 100;
 
             const db = loadDB();
@@ -554,14 +567,39 @@
                 campaignId,
                 name,
                 description: "Prêmio promocional exclusivo",
-                displayText: discount,
-                resultText: `${discount} DE DESCONTO`,
-                discount,
+                displayText: displayText || name,
+                resultText: resultText || name.toUpperCase(),
+                discount: displayText || name,
                 weight,
                 quantity,
                 unlimitedQuantity: false,
                 active: true
             });
+            saveDB(db);
+            router();
+        }
+
+        function editPrize(id) {
+            const db = loadDB();
+            const p = db.prizes.find(x => x.id === id);
+            if (!p) return;
+
+            const name = prompt("Nome do Prêmio / Frase:", p.name);
+            if (name === null) return;
+            const displayText = prompt("Texto exibido na Fatia da Roleta:", p.displayText);
+            if (displayText === null) return;
+            const resultText = prompt("Texto exibido no Resultado (Celebração):", p.resultText);
+            if (resultText === null) return;
+            const weight = parseInt(prompt("Peso (probabilidade):", p.weight)) || p.weight;
+            const quantity = parseInt(prompt("Quantidade em estoque:", p.quantity)) || p.quantity;
+
+            p.name = name;
+            p.displayText = displayText;
+            p.resultText = resultText;
+            p.weight = weight;
+            p.quantity = quantity;
+            p.discount = displayText;
+
             saveDB(db);
             router();
         }
@@ -621,7 +659,7 @@
             const db = loadDB();
             if (!db.settings[campaignId]) db.settings[campaignId] = { ...db.settings[1] };
             db.settings[campaignId].title = document.getElementById("st_title").value;
-            db.settings[campaignId].subtitle = document.getElementById("st_subtitle").value;
+            db.settings[campaignId].subtitle = document.getElementById("st_subtitle".value);
             db.settings[campaignId].spin_button = document.getElementById("st_spin_btn").value;
             db.settings[campaignId].bg_color = document.getElementById("st_bg").value;
             db.settings[campaignId].btn_color = document.getElementById("st_btn").value;

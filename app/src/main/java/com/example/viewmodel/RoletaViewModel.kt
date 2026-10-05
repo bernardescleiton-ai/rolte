@@ -55,26 +55,28 @@ class RoletaViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    private var observeJob: kotlinx.coroutines.Job? = null
+
     fun loadCampaignBySlug(slug: String) {
-        viewModelScope.launch {
+        observeJob?.cancel()
+        observeJob = viewModelScope.launch {
             val camp = repository.getCampaignBySlug(slug) ?: repository.campaignDao.getAllCampaigns().firstOrNull()?.firstOrNull()
             _currentCampaign.value = camp
             camp?.let { c ->
-                // Observe prizes
-                repository.getPrizesForCampaign(c.id).collect { prizeList ->
-                    _prizes.value = prizeList
+                launch {
+                    repository.getPrizesForCampaign(c.id).collect { prizeList ->
+                        _prizes.value = prizeList
+                    }
                 }
-            }
-            camp?.let { c ->
-                // Observe codes
-                repository.getCodesForCampaign(c.id).collect { codeList ->
-                    _accessCodes.value = codeList
+                launch {
+                    repository.getCodesForCampaign(c.id).collect { codeList ->
+                        _accessCodes.value = codeList
+                    }
                 }
-            }
-            camp?.let { c ->
-                // Observe settings
-                repository.getSettings(c.id).collect { settingsList ->
-                    _settings.value = settingsList.associate { it.key to it.value }
+                launch {
+                    repository.getSettings(c.id).collect { settingsList ->
+                        _settings.value = settingsList.associate { it.key to it.value }
+                    }
                 }
             }
         }

@@ -7,10 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-
     <style>
         .gold-text {
             background: linear-gradient(180deg, #FFFDF0 0%, #FDE047 50%, #CA8A04 100%);
@@ -42,26 +38,26 @@
         <!-- Rendered dynamically by JS -->
     </div>
 
-    <script>
-        // --- Firebase Cloud Connection ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyCih_2uLEd3257YvHXY2dkQxymTqDTOd3M",
-            authDomain: "roleta-20f73.firebaseapp.com",
-            projectId: "roleta-20f73",
-            storageBucket: "roleta-20f73.firebasestorage.app",
-            messagingSenderId: "467195297348",
-            appId: "1:467195297348:web:46b066b463f721aeb50611",
-            measurementId: "G-NEZMEHLZ95"
-        };
+    <!-- Modals Container -->
+    <div id="modalContainer"></div>
 
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
-        const dbCloud = firebase.firestore();
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-6 right-6 z-50 transform transition-all duration-300 translate-y-24 opacity-0 pointer-events-none bg-slate-900 border border-yellow-500/50 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 text-sm">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
+        <span id="toastMsg">Mensagem</span>
+    </div>
+
+    <script>
+        // --- Supabase Cloud Connection ---
+        const SUPABASE_URL = "https://glcsnkebmjtuqeciihzu.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_hxcloNo4rrkNUvtJ4ogk7A_FGaGTSfT";
+
+        let supabaseStatus = "connected"; // "connected", "syncing", "error"
+        let supabaseErrorMessage = "";
+        let isSaving = false;
 
         // --- Database & LocalStorage State Management ---
         const DB_KEY = "roleta_db_v1";
-        let isCloudSynced = false;
 
         function getInitialData() {
             return {
@@ -69,11 +65,11 @@
                     { id: 1, name: "Outubro Premiado", slug: "outubro", active: true }
                 ],
                 prizes: [
-                    { id: 1, campaignId: 1, name: "1 Mês Gratuito", description: "Acesso completo gratuito por 30 dias", displayText: "1 MÊS GRATUITO", resultText: "1 MÊS GRATUITO", discount: "1 Mês Grátis", weight: 10, quantity: 50, unlimitedQuantity: false, active: true },
-                    { id: 2, campaignId: 1, name: "R$ 15 de Desconto", description: "Desconto exclusivo de R$ 15", displayText: "R$ 15 DE DESCONTO", resultText: "R$ 15 DE DESCONTO", discount: "R$ 15", weight: 25, quantity: 200, unlimitedQuantity: false, active: true },
-                    { id: 3, campaignId: 1, name: "R$ 10 de Desconto", description: "Desconto exclusivo de R$ 10", displayText: "R$ 10 DE DESCONTO", resultText: "R$ 10 DE DESCONTO", discount: "R$ 10", weight: 30, quantity: 300, unlimitedQuantity: false, active: true },
-                    { id: 4, campaignId: 1, name: "R$ 5 de Desconto", description: "Desconto de R$ 5 para você aproveitar", displayText: "R$ 5 DE DESCONTO", resultText: "R$ 5 DE DESCONTO", discount: "R$ 5", weight: 40, quantity: 500, unlimitedQuantity: false, active: true },
-                    { id: 5, campaignId: 1, name: "R$ 20 de Desconto", description: "Super desconto de R$ 20 exclusivo", displayText: "R$ 20 DE DESCONTO", resultText: "R$ 20 DE DESCONTO", discount: "R$ 20", weight: 15, quantity: 100, unlimitedQuantity: false, active: true }
+                    { id: 1, campaignId: 1, name: "5% de Desconto", description: "Desconto exclusivo de 5%", displayText: "5%", resultText: "5% DE DESCONTO", discount: "5%", weight: 35, quantity: 500, unlimitedQuantity: false, active: true },
+                    { id: 2, campaignId: 1, name: "10% de Desconto", description: "Desconto especial de 10%", displayText: "10%", resultText: "10% DE DESCONTO", discount: "10%", weight: 30, quantity: 300, unlimitedQuantity: false, active: true },
+                    { id: 3, campaignId: 1, name: "15% de Desconto", description: "Desconto exclusivo de 15%", displayText: "15%", resultText: "15% DE DESCONTO", discount: "15%", weight: 20, quantity: 150, unlimitedQuantity: false, active: true },
+                    { id: 4, campaignId: 1, name: "20% de Desconto", description: "Super desconto de 20%", displayText: "20%", resultText: "20% DE DESCONTO", discount: "20%", weight: 12, quantity: 80, unlimitedQuantity: false, active: true },
+                    { id: 5, campaignId: 1, name: "50% de Desconto", description: "Prêmio máximo da roleta!", displayText: "50%", resultText: "50% DE DESCONTO", discount: "50%", weight: 3, quantity: 10, unlimitedQuantity: false, active: true }
                 ],
                 codes: [
                     { id: 1, campaignId: 1, code: "RLT-7X92KP", status: "AVAILABLE", usedAt: null },
@@ -111,50 +107,142 @@
             const data = localStorage.getItem(DB_KEY);
             if (!data) {
                 const initial = getInitialData();
-                saveDB(initial);
+                localStorage.setItem(DB_KEY, JSON.stringify(initial));
                 return initial;
             }
             try {
-                return JSON.parse(data);
+                const parsed = JSON.parse(data);
+                if (!parsed.campaigns || !parsed.prizes) {
+                    const initial = getInitialData();
+                    localStorage.setItem(DB_KEY, JSON.stringify(initial));
+                    return initial;
+                }
+                return parsed;
             } catch (e) {
                 const initial = getInitialData();
-                saveDB(initial);
+                localStorage.setItem(DB_KEY, JSON.stringify(initial));
                 return initial;
             }
         }
 
-        function saveDB(db) {
-            localStorage.setItem(DB_KEY, JSON.stringify(db));
-            // Sync to Firestore in real-time
+        async function fetchFromSupabase(silent = false) {
             try {
-                dbCloud.collection("roletas").doc("config").set(db).catch(err => {
-                    console.warn("Firestore save error:", err);
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/user_favorites?song_id=eq.roleta_config`, {
+                    headers: {
+                        "apikey": SUPABASE_KEY,
+                        "Authorization": `Bearer ${SUPABASE_KEY}`
+                    }
                 });
+
+                if (!res.ok) {
+                    throw new Error("HTTP " + res.status);
+                }
+
+                const list = await res.json();
+                if (list && list.length > 0 && list[0].video_data) {
+                    const cloudData = list[0].video_data;
+                    if (cloudData.campaigns && Array.isArray(cloudData.campaigns)) {
+                        localStorage.setItem(DB_KEY, JSON.stringify(cloudData));
+                        supabaseStatus = "connected";
+                        supabaseErrorMessage = "";
+                        updateSupabaseUI();
+                        router();
+                        if (!silent) showToast("Sincronizado com Supabase com sucesso!", "success");
+                        return;
+                    }
+                }
+
+                // If no row exists yet, seed it with current local db
+                const current = loadDB();
+                await saveToSupabase(current, false);
+                supabaseStatus = "connected";
+                updateSupabaseUI();
             } catch (e) {
-                console.warn("Firestore sync error:", e);
+                console.warn("Supabase fetch warning:", e);
+                supabaseStatus = "error";
+                supabaseErrorMessage = e.message || "Erro de conexão";
+                updateSupabaseUI();
             }
         }
 
-        // Real-time synchronization from Firestore
-        try {
-            dbCloud.collection("roletas").doc("config").onSnapshot(doc => {
-                if (doc.exists) {
-                    const cloudData = doc.data();
-                    if (cloudData && cloudData.campaigns) {
-                        localStorage.setItem(DB_KEY, JSON.stringify(cloudData));
-                        isCloudSynced = true;
-                        router();
-                    }
-                } else {
-                    // Seed cloud with initial data
-                    const initial = loadDB();
-                    dbCloud.collection("roletas").doc("config").set(initial);
+        async function saveToSupabase(db, notify = true) {
+            isSaving = true;
+            try {
+                const res = await fetch(`${SUPABASE_URL}/rest/v1/user_favorites?song_id=eq.roleta_config`, {
+                    method: "PATCH",
+                    headers: {
+                        "apikey": SUPABASE_KEY,
+                        "Authorization": `Bearer ${SUPABASE_KEY}`,
+                        "Content-Type": "application/json",
+                        "Prefer": "return=representation"
+                    },
+                    body: JSON.stringify({
+                        video_data: db,
+                        updated_at: new Date().toISOString()
+                    })
+                });
+
+                if (!res.ok) {
+                    throw new Error("HTTP " + res.status);
                 }
-            }, err => {
-                console.warn("Firestore listener error:", err);
-            });
-        } catch (e) {
-            console.warn("Error setting up Firestore listener:", e);
+
+                supabaseStatus = "connected";
+                supabaseErrorMessage = "";
+                updateSupabaseUI();
+                if (notify) showToast("Salvo e sincronizado no Supabase em tempo real!", "success");
+            } catch (e) {
+                console.error("Supabase save error:", e);
+                supabaseStatus = "error";
+                supabaseErrorMessage = e.message || "Erro ao salvar no Supabase";
+                updateSupabaseUI();
+                if (notify) showToast("Salvo localmente! Verifique a conexão com o Supabase.", "warning");
+            } finally {
+                isSaving = false;
+            }
+        }
+
+        function saveDB(db, notify = true) {
+            localStorage.setItem(DB_KEY, JSON.stringify(db));
+            saveToSupabase(db, notify);
+        }
+
+        // Auto-fetch on initial page load
+        fetchFromSupabase(true);
+
+        // Auto-sync when user returns to tab
+        window.addEventListener("focus", () => fetchFromSupabase(true));
+
+        // Periodic background sync every 15 seconds
+        setInterval(() => {
+            if (!isSpinning && !isSaving) {
+                fetchFromSupabase(true);
+            }
+        }, 15000);
+
+        function showToast(msg, type = "success") {
+            const toast = document.getElementById("toast");
+            const toastMsg = document.getElementById("toastMsg");
+            const toastIcon = document.getElementById("toastIcon");
+            if (!toast) return;
+
+            toastMsg.innerText = msg;
+            if (type === "success") {
+                toastIcon.className = "fa-solid fa-circle-check text-emerald-400 text-lg";
+            } else if (type === "warning") {
+                toastIcon.className = "fa-solid fa-triangle-exclamation text-amber-400 text-lg";
+            } else if (type === "error") {
+                toastIcon.className = "fa-solid fa-circle-xmark text-red-400 text-lg";
+            } else {
+                toastIcon.className = "fa-solid fa-info-circle text-blue-400 text-lg";
+            }
+
+            toast.classList.remove("translate-y-24", "opacity-0", "pointer-events-none");
+            toast.classList.add("translate-y-0", "opacity-100");
+
+            setTimeout(() => {
+                toast.classList.add("translate-y-24", "opacity-0", "pointer-events-none");
+                toast.classList.remove("translate-y-0", "opacity-100");
+            }, 3500);
         }
 
         // --- Router & App State ---
@@ -181,16 +269,16 @@
                 }
             } catch (e) {
                 console.error("Router error:", e);
-                document.getElementById("app").innerHTML = `<div class="p-8 text-red-500">Erro ao carregar a página: ${e.message}</div>`;
+                document.getElementById("app").innerHTML = `<div class="p-8 text-red-500 font-bold">Erro ao carregar tela: ${e.message}</div>`;
             }
         }
 
         window.addEventListener("hashchange", router);
         window.addEventListener("load", router);
 
-        // --- Public Roleta Screen (ZERO admin buttons) ---
+        // --- Public Roleta Screen (Zero admin buttons) ---
         function renderPublicRoleta(container, db, campaign) {
-            if (!campaign || !campaign.active) {
+            if (!campaign || campaign.active === false) {
                 container.innerHTML = `
                     <div class="flex-1 flex items-center justify-center p-6 text-center">
                         <div class="bg-slate-900 p-8 rounded-2xl shadow-xl max-w-md w-full border border-slate-800">
@@ -202,8 +290,16 @@
                 return;
             }
 
-            const settings = (db.settings || {})[campaign.id] || (db.settings || {})[1] || {};
-            const prizes = (db.prizes || []).filter(p => p.campaignId === campaign.id && p.active && (p.unlimitedQuantity || p.quantity > 0));
+            const settings = (db.settings || {})[campaign.id] || (db.settings || {})[1] || (db.settings || {})[Object.keys(db.settings || {})[0]] || {};
+            
+            // Filter prizes for this campaign, with safe fallback
+            let prizes = (db.prizes || []).filter(p => String(p.campaignId) === String(campaign.id) && p.active !== false && (p.unlimitedQuantity || p.quantity === undefined || p.quantity > 0));
+            if (prizes.length === 0 && (db.prizes || []).length > 0) {
+                prizes = (db.prizes || []).filter(p => p.active !== false && (p.unlimitedQuantity || p.quantity === undefined || p.quantity > 0));
+            }
+            if (prizes.length === 0) {
+                prizes = (db.prizes || []);
+            }
 
             container.innerHTML = `
                 <div class="flex-1 flex flex-col items-center justify-center p-4 relative" style="background-color: ${settings.bg_color || '#060913'}; color: ${settings.text_color || '#FFFFFF'};">
@@ -277,7 +373,7 @@
                                     <div class="text-3xl font-black text-white drop-shadow-[0_2px_8px_rgba(251,191,36,0.7)]">${lastWonPrize.resultText || lastWonPrize.name}</div>
                                     <p class="text-sm text-slate-300">${lastWonPrize.description}</p>
                                     <p class="text-xs text-yellow-400/80 mt-2 font-medium">${settings.result_success_msg || ''}</p>
-                                    <button onclick="location.reload()" class="mt-4 px-6 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-yellow-400 font-bold text-xs uppercase tracking-wider transition shadow-md">Girar Novamente</button>
+                                    <button onclick="resetAndReload()" class="mt-4 px-6 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-yellow-400 font-bold text-xs uppercase tracking-wider transition shadow-md">Girar Novamente</button>
                                 </div>
                             `}
                         </div>
@@ -286,6 +382,14 @@
             `;
 
             drawWheel(prizes, currentRotation);
+            requestAnimationFrame(() => drawWheel(prizes, currentRotation));
+        }
+
+        function resetAndReload() {
+            currentCodeObj = null;
+            lastWonPrize = null;
+            isSpinning = false;
+            router();
         }
 
         function drawWheel(prizes, rotationAngle) {
@@ -299,7 +403,7 @@
 
             ctx.clearRect(0, 0, width, height);
 
-            if (prizes.length === 0) return;
+            if (!prizes || prizes.length === 0) return;
 
             const sliceAngle = (2 * Math.PI) / prizes.length;
             const colors = ["#7C3AED", "#2563EB", "#059669", "#DB2777", "#EA580C"];
@@ -332,7 +436,7 @@
                 ctx.shadowColor = "rgba(0, 0, 0, 0.95)";
                 ctx.shadowBlur = 8;
                 ctx.font = "bold 14px sans-serif";
-                ctx.fillText(prize.displayText || prize.name, radius - 20, 5);
+                ctx.fillText(prize.displayText || prize.discount || prize.name, radius - 20, 5);
                 ctx.restore();
             });
 
@@ -349,7 +453,7 @@
                 return;
             }
 
-            const codeObj = (db.codes || []).find(c => c.campaignId === campaignId && c.code === input);
+            const codeObj = (db.codes || []).find(c => String(c.campaignId) === String(campaignId) && c.code === input);
             if (!codeObj) {
                 errDiv.innerText = "Código inválido.";
                 return;
@@ -375,33 +479,39 @@
             isSpinning = true;
 
             const db = loadDB();
-            const prizes = (db.prizes || []).filter(p => p.campaignId === campaignId && p.active && (p.unlimitedQuantity || p.quantity > 0));
+            let prizes = (db.prizes || []).filter(p => String(p.campaignId) === String(campaignId) && p.active !== false && (p.unlimitedQuantity || p.quantity === undefined || p.quantity > 0));
+            if (prizes.length === 0 && (db.prizes || []).length > 0) {
+                prizes = (db.prizes || []).filter(p => p.active !== false && (p.unlimitedQuantity || p.quantity === undefined || p.quantity > 0));
+            }
 
             if (prizes.length === 0) {
-                alert("Nenhum prêmio disponível.");
+                alert("Nenhum prêmio disponível no momento.");
                 isSpinning = false;
                 return;
             }
 
-            const totalWeight = prizes.reduce((sum, p) => sum + p.weight, 0);
+            const totalWeight = prizes.reduce((sum, p) => sum + (p.weight || 10), 0);
             let randomWeight = Math.floor(Math.random() * totalWeight);
             let selectedPrize = prizes[0];
 
             for (let p of prizes) {
-                if (randomWeight < p.weight) {
+                const w = p.weight || 10;
+                if (randomWeight < w) {
                     selectedPrize = p;
                     break;
                 }
-                randomWeight -= p.weight;
+                randomWeight -= w;
             }
 
+            // Mark code as used
             const codeIndex = db.codes.findIndex(c => c.id === currentCodeObj.id);
             if (codeIndex !== -1) {
                 db.codes[codeIndex].status = "USED";
                 db.codes[codeIndex].usedAt = Date.now();
             }
 
-            if (!selectedPrize.unlimitedQuantity && selectedPrize.quantity > 0) {
+            // Decrease quantity
+            if (!selectedPrize.unlimitedQuantity && selectedPrize.quantity !== undefined && selectedPrize.quantity > 0) {
                 const prizeIndex = db.prizes.findIndex(p => p.id === selectedPrize.id);
                 if (prizeIndex !== -1) {
                     db.prizes[prizeIndex].quantity -= 1;
@@ -411,21 +521,23 @@
                 }
             }
 
+            // Record spin
             const newSpin = {
                 id: Date.now(),
                 campaignId: campaignId,
-                accessCodeId: currentCodeObj.id,
+                accessCodeId: currentCodeObj.code,
                 prizeId: selectedPrize.id,
                 clientName: "",
                 observation: "",
                 prizeNameSnapshot: selectedPrize.name,
-                discountSnapshot: selectedPrize.discount,
+                discountSnapshot: selectedPrize.discount || selectedPrize.displayText,
                 createdAt: Date.now()
             };
             if (!db.spins) db.spins = [];
             db.spins.unshift(newSpin);
-            saveDB(db);
+            saveDB(db, false);
 
+            // Calculate precise stop angle
             const prizeIndex = prizes.findIndex(p => p.id === selectedPrize.id);
             const sliceAngleDeg = 360 / prizes.length;
             const targetSliceCenterAngle = prizeIndex * sliceAngleDeg + (sliceAngleDeg / 2);
@@ -450,31 +562,59 @@
         }
 
         // --- Admin Panel (Clean, accessed via #admin) ---
-        let adminTab = "campaigns";
+        let adminTab = "prizes";
+
+        function updateSupabaseUI() {
+            const badge = document.getElementById("sbStatusBadge");
+            if (badge) {
+                badge.innerHTML = renderSupabaseBadgeHtml();
+            }
+        }
+
+        function renderSupabaseBadgeHtml() {
+            if (supabaseStatus === "connected") {
+                return `
+                    <span class="text-xs text-emerald-400 bg-emerald-950/80 border border-emerald-500/50 px-3 py-1.5 rounded-full font-mono flex items-center gap-1.5 shadow">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Supabase Conectado (glcsnkebmjtuqeciihzu)
+                    </span>
+                `;
+            } else {
+                return `
+                    <button onclick="fetchFromSupabase(false)" class="text-xs text-amber-300 bg-amber-950/90 border border-amber-500/60 px-3 py-1.5 rounded-full font-mono flex items-center gap-1.5 hover:bg-amber-900/90 transition shadow">
+                        <i class="fa-solid fa-triangle-exclamation text-amber-400"></i> Reconectar Supabase
+                    </button>
+                `;
+            }
+        }
 
         function renderAdmin(container, db) {
             container.innerHTML = `
                 <div class="flex-1 flex flex-col bg-slate-900 text-white min-h-screen">
-                    <header class="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center">
+                    <header class="bg-slate-900 border-b border-slate-800 p-4 flex flex-wrap justify-between items-center gap-3">
                         <div class="flex items-center gap-3">
                             <h1 class="text-xl font-bold flex items-center gap-2">
                                 <i class="fa-solid fa-gauge-high text-yellow-400"></i> Painel Administrativo
                             </h1>
-                            <span class="text-xs text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-2.5 py-1 rounded-full font-mono hidden sm:inline-flex items-center gap-1.5">
-                                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Firebase Conectado (roleta-20f73)
-                            </span>
+                            <div id="sbStatusBadge">
+                                ${renderSupabaseBadgeHtml()}
+                            </div>
                         </div>
-                        <a href="#roleta/outubro" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 px-4 py-2 rounded-xl text-sm font-extrabold transition flex items-center gap-2 shadow-lg">
-                            <i class="fa-solid fa-eye"></i> Ver Roleta Pública
-                        </a>
+                        <div class="flex items-center gap-2">
+                            <button onclick="fetchFromSupabase(false)" class="bg-slate-800 hover:bg-slate-700 text-yellow-400 border border-yellow-500/30 px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow">
+                                <i class="fa-solid fa-arrows-rotate"></i> Sincronizar Agora
+                            </button>
+                            <a href="#roleta/outubro" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 px-4 py-2 rounded-xl text-sm font-extrabold transition flex items-center gap-2 shadow-lg">
+                                <i class="fa-solid fa-eye"></i> Ver Roleta Pública
+                            </a>
+                        </div>
                     </header>
 
                     <div class="bg-slate-900 border-b border-slate-800 flex overflow-x-auto px-4 gap-2">
-                        <button onclick="setAdminTab('campaigns')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'campaigns' ? 'border-yellow-400 text-yellow-400' : 'border-transparent text-slate-400'}">Campanhas</button>
                         <button onclick="setAdminTab('prizes')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'prizes' ? 'border-yellow-400 text-yellow-400' : 'border-transparent text-slate-400'}">Prêmios & Frases</button>
                         <button onclick="setAdminTab('codes')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'codes' ? 'border-yellow-400 text-yellow-400' : 'border-transparent text-slate-400'}">Códigos</button>
                         <button onclick="setAdminTab('results')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'results' ? 'border-yellow-400 text-yellow-400' : 'border-transparent text-slate-400'}">Resultados</button>
                         <button onclick="setAdminTab('settings')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'settings' ? 'border-yellow-400 text-yellow-400' : 'border-transparent text-slate-400'}">Configurações</button>
+                        <button onclick="setAdminTab('campaigns')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'campaigns' ? 'border-yellow-400 text-yellow-400' : 'border-transparent text-slate-400'}">Campanhas</button>
                     </div>
 
                     <main class="flex-1 p-6 overflow-y-auto max-w-5xl w-full mx-auto" id="adminContent">
@@ -491,55 +631,54 @@
 
         function renderAdminTabContent(db) {
             try {
-                if (adminTab === 'campaigns') {
-                    return `
-                        <div class="space-y-6">
-                            <div class="flex justify-between items-center">
-                                <h2 class="text-2xl font-bold">Campanhas</h2>
-                                <button onclick="openNewCampaignModal()" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 px-4 py-2 rounded-xl font-bold text-sm">+ Nova Campanha</button>
-                            </div>
-                            <div class="grid gap-4">
-                                ${(db.campaigns || []).map(c => `
-                                    <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex justify-between items-center">
-                                        <div>
-                                            <h3 class="font-bold text-lg">${c.name}</h3>
-                                            <p class="text-sm text-yellow-400">Link: <a href="#roleta/${c.slug}" class="underline">/#roleta/${c.slug}</a></p>
-                                        </div>
-                                        <div class="flex items-center gap-3">
-                                            <button onclick="editCampaign(${c.id})" class="text-blue-400 hover:text-blue-300 p-2"><i class="fa-solid fa-pen"></i></button>
-                                            <span class="px-3 py-1 rounded-full text-xs font-bold ${c.active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}">${c.active ? 'Ativa' : 'Inativa'}</span>
-                                            <button onclick="deleteCampaign(${c.id})" class="text-red-400 hover:text-red-300 p-2"><i class="fa-solid fa-trash"></i></button>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    `;
-                } else if (adminTab === 'prizes') {
+                if (adminTab === 'prizes') {
                     const activeCamp = (db.campaigns || [])[0] || { id: 1, name: 'Outubro' };
-                    const prizes = (db.prizes || []).filter(p => p.campaignId === activeCamp.id);
-                    const totalWeight = prizes.filter(p => p.active).reduce((sum, p) => sum + p.weight, 0);
+                    let prizes = (db.prizes || []).filter(p => String(p.campaignId) === String(activeCamp.id));
+                    if (prizes.length === 0 && (db.prizes || []).length > 0) {
+                        prizes = (db.prizes || []);
+                    }
+                    const totalWeight = prizes.filter(p => p.active !== false).reduce((sum, p) => sum + (p.weight || 10), 0);
 
                     return `
                         <div class="space-y-6">
-                            <div class="flex justify-between items-center">
-                                <h2 class="text-2xl font-bold">Prêmios & Frases (${activeCamp.name})</h2>
-                                <button onclick="openNewPrizeModal(${activeCamp.id})" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 px-4 py-2 rounded-xl font-bold text-sm">+ Adicionar Prêmio / Frase</button>
+                            <div class="flex justify-between items-center flex-wrap gap-3">
+                                <div>
+                                    <h2 class="text-2xl font-bold">Prêmios da Roleta</h2>
+                                    <p class="text-xs text-slate-400">Qualquer alteração feita aqui sincroniza no Supabase e atualiza para todos os clientes</p>
+                                </div>
+                                <button onclick="openPrizeModal(null, ${activeCamp.id})" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 px-4 py-2.5 rounded-xl font-black text-sm flex items-center gap-2 shadow-lg">
+                                    <i class="fa-solid fa-plus"></i> Adicionar Prêmio / Frase
+                                </button>
                             </div>
                             <div class="grid gap-4">
                                 ${prizes.map(p => {
-                                    const prob = totalWeight > 0 && p.active ? ((p.weight / totalWeight) * 100).toFixed(1) : 0;
+                                    const w = p.weight || 10;
+                                    const prob = totalWeight > 0 && p.active !== false ? ((w / totalWeight) * 100).toFixed(1) : 0;
                                     return `
-                                        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex justify-between items-center">
-                                            <div>
-                                                <h3 class="font-bold text-lg">${p.name}</h3>
-                                                <p class="text-sm text-slate-300">Texto na Roleta: <span class="font-semibold text-yellow-400">"${p.displayText}"</span> | Peso: ${p.weight} | Probabilidade: <span class="text-yellow-400 font-bold">${prob}%</span></p>
-                                                <p class="text-xs text-slate-500">Estoque: ${p.unlimitedQuantity ? 'Ilimitado' : p.quantity}</p>
+                                        <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 flex flex-wrap justify-between items-center gap-4 hover:border-yellow-500/50 transition">
+                                            <div class="space-y-1">
+                                                <div class="flex items-center gap-3">
+                                                    <h3 class="font-black text-lg text-white">${p.name}</h3>
+                                                    <span class="px-2.5 py-0.5 rounded-full text-xs font-bold ${p.active !== false ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'}">
+                                                        ${p.active !== false ? 'Ativo na Roleta' : 'Inativo'}
+                                                    </span>
+                                                </div>
+                                                <p class="text-sm text-slate-300">
+                                                    Texto na Fatia: <span class="font-bold text-yellow-400 px-2 py-0.5 bg-slate-900 rounded-md">"${p.displayText || p.name}"</span>
+                                                    | Probabilidade: <span class="text-yellow-400 font-bold">${prob}%</span> (Peso ${w})
+                                                </p>
+                                                <p class="text-xs text-slate-400">Estoque: ${p.unlimitedQuantity ? 'Ilimitado' : (p.quantity || 0) + ' restantes'}</p>
                                             </div>
-                                            <div class="flex items-center gap-3">
-                                                <button onclick="editPrize(${p.id})" class="text-blue-400 hover:text-blue-300 p-2" title="Editar Prêmio"><i class="fa-solid fa-pen"></i></button>
-                                                <button onclick="togglePrize(${p.id})" class="px-3 py-1 rounded-full text-xs font-bold ${p.active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'}">${p.active ? 'Ativo' : 'Inativo'}</button>
-                                                <button onclick="deletePrize(${p.id})" class="text-red-400 hover:text-red-300 p-2"><i class="fa-solid fa-trash"></i></button>
+                                            <div class="flex items-center gap-2">
+                                                <button onclick="openPrizeModal(${p.id}, ${p.campaignId || activeCamp.id})" class="bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5" title="Editar Prêmio">
+                                                    <i class="fa-solid fa-pen"></i> Editar
+                                                </button>
+                                                <button onclick="togglePrize(${p.id})" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-xl text-xs font-bold transition">
+                                                    ${p.active !== false ? 'Desativar' : 'Ativar'}
+                                                </button>
+                                                <button onclick="deletePrize(${p.id})" class="bg-red-600/30 hover:bg-red-600/50 text-red-300 p-2.5 rounded-xl transition" title="Excluir">
+                                                    <i class="fa-solid fa-trash"></i>
+                                                </button>
                                             </div>
                                         </div>
                                     `;
@@ -549,15 +688,22 @@
                     `;
                 } else if (adminTab === 'codes') {
                     const activeCamp = (db.campaigns || [])[0] || { id: 1 };
-                    const codes = (db.codes || []).filter(c => c.campaignId === activeCamp.id);
+                    const codes = (db.codes || []).filter(c => String(c.campaignId) === String(activeCamp.id));
 
                     return `
                         <div class="space-y-6">
-                            <div class="flex justify-between items-center">
-                                <h2 class="text-2xl font-bold">Códigos de Liberação</h2>
+                            <div class="flex justify-between items-center flex-wrap gap-3">
+                                <div>
+                                    <h2 class="text-2xl font-bold">Códigos de Liberação</h2>
+                                    <p class="text-xs text-slate-400">Os clientes precisam de um código disponível para liberar o giro</p>
+                                </div>
                                 <div class="flex gap-2">
-                                    <button onclick="generateCodes(${activeCamp.id}, 50)" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 px-4 py-2 rounded-xl font-bold text-sm">+ Gerar 50 Códigos</button>
-                                    <button onclick="exportCodesCSV()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl font-bold text-sm"><i class="fa-solid fa-download"></i> CSV</button>
+                                    <button onclick="generateCodes(${activeCamp.id}, 50)" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow">
+                                        <i class="fa-solid fa-magic-wand-sparkles"></i> Gerar 50 Códigos
+                                    </button>
+                                    <button onclick="exportCodesCSV()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2">
+                                        <i class="fa-solid fa-download"></i> CSV
+                                    </button>
                                 </div>
                             </div>
                             <div class="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
@@ -573,13 +719,13 @@
                                     <tbody class="divide-y divide-slate-700 text-sm">
                                         ${codes.map(c => `
                                             <tr>
-                                                <td class="p-4 font-mono font-bold">${c.code}</td>
+                                                <td class="p-4 font-mono font-bold text-yellow-400">${c.code}</td>
                                                 <td class="p-4">
                                                     <span class="px-2.5 py-1 rounded-full text-xs font-bold ${c.status === 'AVAILABLE' ? 'bg-emerald-500/20 text-emerald-400' : c.status === 'USED' ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-700 text-slate-400'}">${c.status}</span>
                                                 </td>
                                                 <td class="p-4 text-slate-400">${c.usedAt ? new Date(c.usedAt).toLocaleString() : '-'}</td>
                                                 <td class="p-4 text-right">
-                                                    <button onclick="deleteCode(${c.id})" class="text-red-400 hover:text-red-300"><i class="fa-solid fa-trash"></i></button>
+                                                    <button onclick="deleteCode(${c.id})" class="text-red-400 hover:text-red-300 p-2"><i class="fa-solid fa-trash"></i></button>
                                                 </td>
                                             </tr>
                                         `).join('')}
@@ -592,16 +738,23 @@
                     return `
                         <div class="space-y-6">
                             <div class="flex justify-between items-center">
-                                <h2 class="text-2xl font-bold">Resultados dos Giros</h2>
-                                <button onclick="exportResultsCSV()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl font-bold text-sm"><i class="fa-solid fa-download"></i> CSV</button>
+                                <div>
+                                    <h2 class="text-2xl font-bold">Resultados dos Giros</h2>
+                                    <p class="text-xs text-slate-400">Histórico de prêmios sorteados pelos clientes</p>
+                                </div>
+                                <button onclick="exportResultsCSV()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2">
+                                    <i class="fa-solid fa-download"></i> CSV
+                                </button>
                             </div>
                             <div class="grid gap-4">
-                                ${(db.spins || []).map(s => `
-                                    <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 space-y-4">
-                                        <div class="flex justify-between items-start">
+                                ${(db.spins || []).length === 0 ? `
+                                    <div class="bg-slate-800/60 p-8 rounded-2xl text-center text-slate-400">Nenhum giro registrado ainda.</div>
+                                ` : (db.spins || []).map(s => `
+                                    <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 space-y-3">
+                                        <div class="flex justify-between items-start flex-wrap gap-2">
                                             <div>
                                                 <h3 class="font-bold text-lg text-yellow-400">${s.prizeNameSnapshot} (${s.discountSnapshot})</h3>
-                                                <p class="text-xs text-slate-400">${new Date(s.createdAt).toLocaleString()}</p>
+                                                <p class="text-xs text-slate-400 font-mono">Código: ${s.accessCodeId} | Data: ${new Date(s.createdAt).toLocaleString()}</p>
                                             </div>
                                         </div>
                                         <div class="grid sm:grid-cols-2 gap-3">
@@ -615,35 +768,64 @@
                     `;
                 } else if (adminTab === 'settings') {
                     const activeCamp = (db.campaigns || [])[0] || { id: 1 };
-                    const s = (db.settings || {})[activeCamp.id] || { title: "Roleta", subtitle: "", spin_button: "GIRAR", bg_color: "#060913", btn_color: "#FACC15" };
+                    const s = (db.settings || {})[activeCamp.id] || (db.settings || {})[1] || { title: "ROLETA DA SORTE", subtitle: "Gire a roleta e ganhe prêmios!", spin_button: "CLIQUE AQUI E GIRE A ROLETA", bg_color: "#060913", btn_color: "#FACC15" };
 
                     return `
                         <div class="space-y-6 max-w-xl">
-                            <h2 class="text-2xl font-bold">Configurações da Página</h2>
+                            <div>
+                                <h2 class="text-2xl font-bold">Textos e Aparência da Roleta</h2>
+                                <p class="text-xs text-slate-400">Personalize os títulos, botões e cores da página pública</p>
+                            </div>
                             <div class="space-y-4 bg-slate-800 p-6 rounded-2xl border border-slate-700">
                                 <div>
                                     <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Título Principal</label>
-                                    <input type="text" id="st_title" value="${s.title || ''}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl">
+                                    <input type="text" id="st_title" value="${s.title || ''}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2.5 rounded-xl font-bold">
                                 </div>
                                 <div>
                                     <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Subtítulo</label>
-                                    <input type="text" id="st_subtitle" value="${s.subtitle || ''}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl">
+                                    <input type="text" id="st_subtitle" value="${s.subtitle || ''}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2.5 rounded-xl">
                                 </div>
                                 <div>
                                     <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Texto do Botão Girar</label>
-                                    <input type="text" id="st_spin_btn" value="${s.spin_button || ''}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl">
+                                    <input type="text" id="st_spin_btn" value="${s.spin_button || ''}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2.5 rounded-xl">
+                                </div>
+                                <div>
+                                    <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Texto do Botão Liberar</label>
+                                    <input type="text" id="st_lib_btn" value="${s.liberate_button || 'LIBERAR ROLETA'}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2.5 rounded-xl">
                                 </div>
                                 <div class="grid grid-cols-2 gap-4">
                                     <div>
                                         <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Cor de Fundo (HEX)</label>
-                                        <input type="text" id="st_bg" value="${s.bg_color || ''}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl">
+                                        <input type="text" id="st_bg" value="${s.bg_color || '#060913'}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2.5 rounded-xl font-mono">
                                     </div>
                                     <div>
                                         <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Cor do Botão (HEX)</label>
-                                        <input type="text" id="st_btn" value="${s.btn_color || ''}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl">
+                                        <input type="text" id="st_btn" value="${s.btn_color || '#FACC15'}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2.5 rounded-xl font-mono">
                                     </div>
                                 </div>
-                                <button onclick="saveSettings(${activeCamp.id})" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 w-full py-3 rounded-xl font-bold">Salvar Configurações</button>
+                                <button onclick="saveSettings(${activeCamp.id})" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 w-full py-3.5 rounded-xl font-black uppercase tracking-wider transition shadow-lg mt-2">Salvar no Supabase</button>
+                            </div>
+                        </div>
+                    `;
+                } else if (adminTab === 'campaigns') {
+                    return `
+                        <div class="space-y-6">
+                            <div class="flex justify-between items-center">
+                                <h2 class="text-2xl font-bold">Campanhas</h2>
+                                <button onclick="openNewCampaignModal()" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 px-4 py-2 rounded-xl font-bold text-sm">+ Nova Campanha</button>
+                            </div>
+                            <div class="grid gap-4">
+                                ${(db.campaigns || []).map(c => `
+                                    <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex justify-between items-center">
+                                        <div>
+                                            <h3 class="font-bold text-lg">${c.name}</h3>
+                                            <p class="text-sm text-yellow-400">Link: <a href="#roleta/${c.slug}" class="underline">/#roleta/${c.slug}</a></p>
+                                        </div>
+                                        <div class="flex items-center gap-3">
+                                            <span class="px-3 py-1 rounded-full text-xs font-bold ${c.active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}">${c.active ? 'Ativa' : 'Inativa'}</span>
+                                        </div>
+                                    </div>
+                                `).join('')}
                             </div>
                         </div>
                     `;
@@ -653,108 +835,127 @@
             }
         }
 
-        function openNewCampaignModal() {
-            const name = prompt("Nome da Campanha:");
-            if (!name) return;
-            const slug = prompt("Slug da URL (ex: promocao-1):", name.toLowerCase().replace(/[^a-z0-9]/g, "-"));
-            if (!slug) return;
-
+        // --- Clean Inline Modal for Prize Add & Edit ---
+        function openPrizeModal(prizeId = null, campaignId = 1) {
             const db = loadDB();
-            const newId = Date.now();
-            if (!db.campaigns) db.campaigns = [];
-            db.campaigns.push({ id: newId, name, slug, active: true });
-            if (!db.settings) db.settings = {};
-            db.settings[newId] = { ...db.settings[1], title: name };
-            saveDB(db);
-            router();
+            let prize = null;
+            if (prizeId) {
+                prize = (db.prizes || []).find(p => p.id == prizeId);
+            }
+
+            const modalContainer = document.getElementById("modalContainer");
+            modalContainer.innerHTML = `
+                <div class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl">
+                        <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+                            <h3 class="text-xl font-bold text-yellow-400 flex items-center gap-2">
+                                <i class="fa-solid fa-gift"></i> ${prize ? 'Editar Prêmio' : 'Novo Prêmio na Roleta'}
+                            </h3>
+                            <button onclick="closeModal()" class="text-slate-400 hover:text-white p-1 text-lg"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div class="space-y-3 text-left">
+                            <div>
+                                <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Nome do Prêmio (ex: R$ 15 de Desconto)</label>
+                                <input type="text" id="m_prize_name" value="${prize ? prize.name : ''}" placeholder="ex: 15% de Desconto" class="w-full bg-slate-950 border border-slate-700 px-4 py-2.5 rounded-xl text-white">
+                            </div>
+                            <div>
+                                <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Texto exibido na Fatia da Roleta (Curto)</label>
+                                <input type="text" id="m_prize_display" value="${prize ? (prize.displayText || prize.name) : ''}" placeholder="ex: 15% ou R$ 15" class="w-full bg-slate-950 border border-slate-700 px-4 py-2.5 rounded-xl font-bold text-yellow-400">
+                            </div>
+                            <div>
+                                <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Texto na Mensagem de Parabéns</label>
+                                <input type="text" id="m_prize_result" value="${prize ? (prize.resultText || prize.name) : ''}" placeholder="ex: 15% DE DESCONTO EXCLUSIVO" class="w-full bg-slate-950 border border-slate-700 px-4 py-2.5 rounded-xl text-white">
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Peso (Probabilidade)</label>
+                                    <input type="number" id="m_prize_weight" value="${prize ? (prize.weight || 20) : 20}" min="1" class="w-full bg-slate-950 border border-slate-700 px-4 py-2.5 rounded-xl text-white font-mono">
+                                </div>
+                                <div>
+                                    <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Estoque</label>
+                                    <input type="number" id="m_prize_quantity" value="${prize ? (prize.quantity !== undefined ? prize.quantity : 100) : 100}" min="0" class="w-full bg-slate-950 border border-slate-700 px-4 py-2.5 rounded-xl text-white font-mono">
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 pt-1">
+                                <input type="checkbox" id="m_prize_unlimited" ${prize && prize.unlimitedQuantity ? 'checked' : ''} class="w-4 h-4 rounded text-yellow-500 bg-slate-950 border-slate-700">
+                                <label for="m_prize_unlimited" class="text-xs text-slate-300">Estoque ilimitado (nunca esgota)</label>
+                            </div>
+                        </div>
+                        <div class="flex gap-3 pt-3">
+                            <button onclick="closeModal()" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-sm">Cancelar</button>
+                            <button onclick="savePrizeFromModal(${prizeId ? prizeId : 'null'}, ${campaignId})" class="flex-1 py-3 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-black text-sm uppercase tracking-wider shadow-lg">Salvar Prêmio</button>
+                        </div>
+                    </div>
+                </div>
+            `;
         }
 
-        function editCampaign(id) {
-            const db = loadDB();
-            const c = db.campaigns.find(x => x.id === id);
-            if (!c) return;
-
-            const name = prompt("Nome da Campanha:", c.name);
-            if (name === null) return;
-            const slug = prompt("Slug da URL:", c.slug);
-            if (slug === null) return;
-
-            c.name = name;
-            c.slug = slug;
-            saveDB(db);
-            router();
+        function closeModal() {
+            document.getElementById("modalContainer").innerHTML = "";
         }
 
-        function deleteCampaign(id) {
-            const db = loadDB();
-            db.campaigns = db.campaigns.filter(c => c.id !== id);
-            saveDB(db);
-            router();
-        }
-
-        function openNewPrizeModal(campaignId) {
-            const name = prompt("Nome do Prêmio / Frase (ex: 10% de Desconto):", "10% de Desconto");
-            if (!name) return;
-            const displayText = prompt("Texto exibido na Fatia da Roleta:", name);
-            const resultText = prompt("Texto exibido no Resultado (Celebração):", name.toUpperCase());
-            const weight = parseInt(prompt("Peso (probabilidade):", "15")) || 10;
-            const quantity = parseInt(prompt("Quantidade em estoque:", "100")) || 100;
+        function savePrizeFromModal(prizeId, campaignId) {
+            const name = document.getElementById("m_prize_name").value.trim();
+            if (!name) {
+                alert("Por favor, preencha o nome do prêmio.");
+                return;
+            }
+            const displayText = document.getElementById("m_prize_display").value.trim() || name;
+            const resultText = document.getElementById("m_prize_result").value.trim() || name.toUpperCase();
+            const weight = parseInt(document.getElementById("m_prize_weight").value) || 10;
+            const quantity = parseInt(document.getElementById("m_prize_quantity").value) || 100;
+            const unlimitedQuantity = document.getElementById("m_prize_unlimited").checked;
 
             const db = loadDB();
             if (!db.prizes) db.prizes = [];
-            db.prizes.push({
-                id: Date.now(),
-                campaignId,
-                name,
-                description: "Prêmio promocional exclusivo",
-                displayText: displayText || name,
-                resultText: resultText || name.toUpperCase(),
-                discount: displayText || name,
-                weight,
-                quantity,
-                unlimitedQuantity: false,
-                active: true
-            });
-            saveDB(db);
-            router();
-        }
 
-        function editPrize(id) {
-            const db = loadDB();
-            const p = db.prizes.find(x => x.id === id);
-            if (!p) return;
-
-            const name = prompt("Nome do Prêmio / Frase:", p.name);
-            if (name === null) return;
-            const displayText = prompt("Texto exibido na Fatia da Roleta:", p.displayText);
-            if (displayText === null) return;
-            const resultText = prompt("Texto exibido no Resultado (Celebração):", p.resultText);
-            if (resultText === null) return;
-            const weight = parseInt(prompt("Peso (probabilidade):", p.weight)) || p.weight;
-            const quantity = parseInt(prompt("Quantidade em estoque:", p.quantity)) || p.quantity;
-
-            p.name = name;
-            p.displayText = displayText;
-            p.resultText = resultText;
-            p.weight = weight;
-            p.quantity = quantity;
-            p.discount = displayText;
+            if (prizeId) {
+                const p = db.prizes.find(x => x.id == prizeId);
+                if (p) {
+                    p.name = name;
+                    p.displayText = displayText;
+                    p.resultText = resultText;
+                    p.discount = displayText;
+                    p.weight = weight;
+                    p.quantity = quantity;
+                    p.unlimitedQuantity = unlimitedQuantity;
+                    p.active = true;
+                }
+            } else {
+                db.prizes.push({
+                    id: Date.now(),
+                    campaignId: campaignId || 1,
+                    name: name,
+                    description: "Prêmio promocional exclusivo",
+                    displayText: displayText,
+                    resultText: resultText,
+                    discount: displayText,
+                    weight: weight,
+                    quantity: quantity,
+                    unlimitedQuantity: unlimitedQuantity,
+                    active: true
+                });
+            }
 
             saveDB(db);
+            closeModal();
             router();
         }
 
         function togglePrize(id) {
             const db = loadDB();
-            const p = db.prizes.find(x => x.id === id);
-            if (p) p.active = !p.active;
-            saveDB(db);
-            router();
+            const p = (db.prizes || []).find(x => x.id == id);
+            if (p) {
+                p.active = p.active === false ? true : false;
+                saveDB(db);
+                router();
+            }
         }
 
         function deletePrize(id) {
+            if (!confirm("Tem certeza que deseja excluir este prêmio da roleta?")) return;
             const db = loadDB();
-            db.prizes = db.prizes.filter(p => p.id !== id);
+            db.prizes = (db.prizes || []).filter(p => p.id != id);
             saveDB(db);
             router();
         }
@@ -770,29 +971,30 @@
                 }
                 db.codes.push({
                     id: Date.now() + Math.random(),
-                    campaignId,
-                    code,
+                    campaignId: campaignId,
+                    code: code,
                     status: "AVAILABLE",
                     usedAt: null
                 });
             }
             saveDB(db);
+            showToast(`${count} novos códigos gerados com sucesso!`, "success");
             router();
         }
 
         function deleteCode(id) {
             const db = loadDB();
-            db.codes = db.codes.filter(c => c.id !== id);
+            db.codes = (db.codes || []).filter(c => c.id != id);
             saveDB(db);
             router();
         }
 
         function updateSpinClient(id, field, value) {
             const db = loadDB();
-            const spin = db.spins.find(s => s.id === id);
+            const spin = (db.spins || []).find(s => s.id == id);
             if (spin) {
                 spin[field] = value;
-                saveDB(db);
+                saveDB(db, false);
             }
         }
 
@@ -800,13 +1002,15 @@
             const db = loadDB();
             if (!db.settings) db.settings = {};
             if (!db.settings[campaignId]) db.settings[campaignId] = { ...db.settings[1] };
+            
             db.settings[campaignId].title = document.getElementById("st_title").value;
             db.settings[campaignId].subtitle = document.getElementById("st_subtitle").value;
             db.settings[campaignId].spin_button = document.getElementById("st_spin_btn").value;
+            db.settings[campaignId].liberate_button = document.getElementById("st_lib_btn").value;
             db.settings[campaignId].bg_color = document.getElementById("st_bg").value;
             db.settings[campaignId].btn_color = document.getElementById("st_btn").value;
+            
             saveDB(db);
-            alert("Configurações salvas com sucesso!");
             router();
         }
 

@@ -24,11 +24,11 @@
                     { id: 1, name: "Outubro Premiado", slug: "outubro", active: true }
                 ],
                 prizes: [
-                    { id: 1, campaignId: 1, name: "5% de Desconto", description: "Desconto em compras acima de R$ 50", displayText: "5%", resultText: "5% DE DESCONTO", discount: "5%", weight: 40, quantity: 500, unlimitedQuantity: false, active: true },
-                    { id: 2, campaignId: 1, name: "10% de Desconto", description: "Desconto em qualquer produto", displayText: "10%", resultText: "10% DE DESCONTO", discount: "10%", weight: 30, quantity: 200, unlimitedQuantity: false, active: true },
-                    { id: 3, campaignId: 1, name: "15% de Desconto", description: "Desconto especial", displayText: "15%", resultText: "15% DE DESCONTO", discount: "15%", weight: 20, quantity: 50, unlimitedQuantity: false, active: true },
-                    { id: 4, campaignId: 1, name: "20% de Desconto", description: "Super desconto exclusivo", displayText: "20%", resultText: "20% DE DESCONTO", discount: "20%", weight: 8, quantity: 20, unlimitedQuantity: false, active: true },
-                    { id: 5, campaignId: 1, name: "50% de Desconto", description: "Prêmio máximo da roleta!", displayText: "50%", resultText: "50% DE DESCONTO", discount: "50%", weight: 2, quantity: 5, unlimitedQuantity: false, active: true }
+                    { id: 1, campaignId: 1, name: "R$ 5 de Desconto", description: "Desconto em compras acima de R$ 50", displayText: "R$ 5", resultText: "R$ 5 DE DESCONTO", discount: "R$ 5", weight: 40, quantity: 500, unlimitedQuantity: false, active: true },
+                    { id: 2, campaignId: 1, name: "R$ 10 de Desconto", description: "Desconto em qualquer produto", displayText: "R$ 10", resultText: "R$ 10 DE DESCONTO", discount: "R$ 10", weight: 30, quantity: 200, unlimitedQuantity: false, active: true },
+                    { id: 3, campaignId: 1, name: "R$ 20 de Desconto", description: "Desconto especial", displayText: "R$ 20", resultText: "R$ 20 DE DESCONTO", discount: "R$ 20", weight: 20, quantity: 50, unlimitedQuantity: false, active: true },
+                    { id: 4, campaignId: 1, name: "R$ 50 de Desconto", description: "Super desconto exclusivo", displayText: "R$ 50", resultText: "R$ 50 DE DESCONTO", discount: "R$ 50", weight: 8, quantity: 20, unlimitedQuantity: false, active: true },
+                    { id: 5, campaignId: 1, name: "R$ 100 de Desconto", description: "Prêmio máximo da roleta!", displayText: "R$ 100", resultText: "R$ 100 DE DESCONTO", discount: "R$ 100", weight: 2, quantity: 5, unlimitedQuantity: false, active: true }
                 ],
                 codes: [
                     { id: 1, campaignId: 1, code: "RLT-7X92KP", status: "AVAILABLE", usedAt: null },
@@ -67,7 +67,13 @@
                 return initial;
             }
             try {
-                return JSON.parse(data);
+                const db = JSON.parse(data);
+                if (db.prizes && db.prizes.length > 0 && db.prizes[0].name.includes("%")) {
+                    const initial = getInitialData();
+                    db.prizes = initial.prizes;
+                    saveDB(db);
+                }
+                return db;
             } catch (e) {
                 const initial = getInitialData();
                 saveDB(initial);
@@ -85,14 +91,13 @@
         let lastWonPrize = null;
 
         function router() {
-            const hash = window.location.hash; // e.g. #admin or #roleta/outubro
+            const hash = window.location.hash;
             const app = document.getElementById("app");
             const db = loadDB();
 
             if (hash.startsWith("#admin")) {
                 renderAdmin(app, db);
             } else {
-                // Public roleta
                 let slug = "outubro";
                 if (hash.startsWith("#roleta/")) {
                     slug = hash.replace("#roleta/", "");
@@ -113,7 +118,6 @@
                         <div class="bg-slate-900 p-8 rounded-2xl shadow-xl max-w-md w-full border border-slate-800">
                             <h1 class="text-2xl font-bold text-red-500 mb-2">Campanha Indisponível</h1>
                             <p class="text-slate-400">Esta campanha de prêmios está encerrada ou não existe.</p>
-                            <a href="#admin" class="mt-6 inline-block bg-emerald-600 text-white px-6 py-2 rounded-xl font-bold">Ir para o Painel Admin</a>
                         </div>
                     </div>
                 `;
@@ -125,13 +129,6 @@
 
             container.innerHTML = `
                 <div class="flex-1 flex flex-col items-center justify-center p-4 relative" style="background-color: ${settings.bg_color}; color: ${settings.text_color};">
-                    <!-- Admin Button Top Right -->
-                    <div class="absolute top-4 right-4">
-                        <a href="#admin" class="bg-slate-800/80 hover:bg-slate-700 text-slate-300 p-3 rounded-full shadow-lg transition flex items-center gap-2 text-sm font-semibold">
-                            <i class="fa-solid fa-gear"></i> <span class="hidden sm:inline">Admin</span>
-                        </a>
-                    </div>
-
                     <div class="max-w-md w-full text-center px-4">
                         <h1 class="text-3xl font-extrabold mb-2">${settings.title}</h1>
                         <p class="text-sm opacity-80 mb-8">${settings.subtitle}</p>
@@ -215,14 +212,13 @@
                 ctx.lineWidth = 2;
                 ctx.stroke();
 
-                // Draw text
                 ctx.save();
                 ctx.translate(center, center);
                 ctx.rotate(startAngle + sliceAngle / 2);
                 ctx.textAlign = "right";
                 ctx.fillStyle = "#FFFFFF";
-                ctx.font = "bold 14px sans-serif";
-                ctx.fillText(prize.displayText || prize.name, radius - 20, 5);
+                ctx.font = "bold 13px sans-serif";
+                ctx.fillText(prize.displayText || prize.name, radius - 15, 5);
                 ctx.restore();
             });
 
@@ -273,7 +269,6 @@
                 return;
             }
 
-            // Weighted lottery
             const totalWeight = prizes.reduce((sum, p) => sum + p.weight, 0);
             let randomWeight = Math.floor(Math.random() * totalWeight);
             let selectedPrize = prizes[0];
@@ -286,14 +281,12 @@
                 randomWeight -= p.weight;
             }
 
-            // Update Code status
             const codeIndex = db.codes.findIndex(c => c.id === currentCodeObj.id);
             if (codeIndex !== -1) {
                 db.codes[codeIndex].status = "USED";
                 db.codes[codeIndex].usedAt = Date.now();
             }
 
-            // Update Prize quantity
             if (!selectedPrize.unlimitedQuantity && selectedPrize.quantity > 0) {
                 const prizeIndex = db.prizes.findIndex(p => p.id === selectedPrize.id);
                 if (prizeIndex !== -1) {
@@ -304,7 +297,6 @@
                 }
             }
 
-            // Record spin
             const newSpin = {
                 id: Date.now(),
                 campaignId: campaignId,
@@ -319,7 +311,6 @@
             db.spins.unshift(newSpin);
             saveDB(db);
 
-            // Animate wheel
             const prizeIndex = prizes.findIndex(p => p.id === selectedPrize.id);
             const sliceAngle = 360 / prizes.length;
             const targetAngle = 360 * 5 + (360 - (prizeIndex * sliceAngle + sliceAngle / 2));
@@ -342,7 +333,6 @@
         function renderAdmin(container, db) {
             container.innerHTML = `
                 <div class="flex-1 flex flex-col bg-slate-900 text-white">
-                    <!-- Top Bar -->
                     <header class="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center">
                         <h1 class="text-xl font-bold flex items-center gap-2">
                             <i class="fa-solid fa-gauge-high text-emerald-500"></i> Painel Administrativo
@@ -352,7 +342,6 @@
                         </a>
                     </header>
 
-                    <!-- Navigation Tabs -->
                     <div class="bg-slate-900 border-b border-slate-800 flex overflow-x-auto px-4 gap-2">
                         <button onclick="setAdminTab('campaigns')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'campaigns' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400'}">Campanhas</button>
                         <button onclick="setAdminTab('prizes')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'prizes' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400'}">Prêmios</button>
@@ -361,7 +350,6 @@
                         <button onclick="setAdminTab('settings')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'settings' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400'}">Configurações</button>
                     </div>
 
-                    <!-- Tab Content -->
                     <main class="flex-1 p-6 overflow-y-auto max-w-5xl w-full mx-auto" id="adminContent">
                         ${renderAdminTabContent(db)}
                     </main>
@@ -416,7 +404,7 @@
                                     <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex justify-between items-center">
                                         <div>
                                             <h3 class="font-bold text-lg">${p.name}</h3>
-                                            <p class="text-sm text-slate-400">Desconto: ${p.discount} | Peso: ${p.weight} | Probabilidade: <span class="text-emerald-400 font-bold">${prob}%</span></p>
+                                            <p class="text-sm text-slate-400">Valor: ${p.discount} | Peso: ${p.weight} | Probabilidade: <span class="text-emerald-400 font-bold">${prob}%</span></p>
                                             <p class="text-xs text-slate-500">Estoque: ${p.unlimitedQuantity ? 'Ilimitado' : p.quantity}</p>
                                         </div>
                                         <div class="flex items-center gap-3">
@@ -532,7 +520,6 @@
             }
         }
 
-        // --- Admin Actions ---
         function openNewCampaignModal() {
             const name = prompt("Nome da Campanha:");
             if (!name) return;
@@ -555,9 +542,9 @@
         }
 
         function openNewPrizeModal(campaignId) {
-            const name = prompt("Nome do Prêmio (ex: 20% de Desconto):");
+            const name = prompt("Nome do Prêmio (ex: R$ 20 de Desconto):", "R$ 20 de Desconto");
             if (!name) return;
-            const discount = prompt("Valor do Desconto (ex: 20%):", "20%");
+            const discount = prompt("Valor do Desconto (ex: R$ 20):", "R$ 20");
             const weight = parseInt(prompt("Peso (ex: 15):", "15")) || 10;
             const quantity = parseInt(prompt("Quantidade em estoque:", "100")) || 100;
 
@@ -654,7 +641,7 @@
 
         function exportResultsCSV() {
             const db = loadDB();
-            let csv = "Codigo,Cliente,Premio,Desconto,Data,Observacao\n";
+            let csv = "Codigo,Cliente,Premio,Valor,Data,Observacao\n";
             db.spins.forEach(s => {
                 csv += `"${s.accessCodeId}","${s.clientName || ''}","${s.prizeNameSnapshot}","${s.discountSnapshot}","${new Date(s.createdAt).toISOString()}","${s.observation || ''}"\n`;
             });

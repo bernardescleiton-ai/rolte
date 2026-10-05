@@ -71,22 +71,6 @@ fun RoletaPublicScreen(
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Admin button in top right
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(8.dp),
-            contentAlignment = Alignment.TopEnd
-        ) {
-            IconButton(onClick = onNavigateAdmin) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = "Painel Administrativo",
-                    tint = textColor.copy(alpha = 0.7f)
-                )
-            }
-        }
-
         Column(
             modifier = Modifier
                 .fillMaxWidth()

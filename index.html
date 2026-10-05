@@ -124,26 +124,31 @@
         let currentRotation = 0;
 
         function router() {
-            const hash = window.location.hash;
-            const app = document.getElementById("app");
-            const db = loadDB();
+            try {
+                const hash = window.location.hash;
+                const app = document.getElementById("app");
+                const db = loadDB();
 
-            if (hash.includes("admin")) {
-                renderAdmin(app, db);
-            } else {
-                let slug = "outubro";
-                if (hash.startsWith("#roleta/")) {
-                    slug = hash.replace("#roleta/", "");
+                if (hash.includes("admin")) {
+                    renderAdmin(app, db);
+                } else {
+                    let slug = "outubro";
+                    if (hash.startsWith("#roleta/")) {
+                        slug = hash.replace("#roleta/", "");
+                    }
+                    const campaign = db.campaigns.find(c => c.slug === slug) || db.campaigns[0];
+                    renderPublicRoleta(app, db, campaign);
                 }
-                const campaign = db.campaigns.find(c => c.slug === slug) || db.campaigns[0];
-                renderPublicRoleta(app, db, campaign);
+            } catch (e) {
+                console.error("Router error:", e);
+                document.getElementById("app").innerHTML = `<div class="p-8 text-red-500">Erro ao carregar a página: ${e.message}</div>`;
             }
         }
 
         window.addEventListener("hashchange", router);
         window.addEventListener("load", router);
 
-        // --- Public Roleta Screen (ZERO admin buttons) ---
+        // --- Public Roleta Screen ---
         function renderPublicRoleta(container, db, campaign) {
             if (!campaign || !campaign.active) {
                 container.innerHTML = `
@@ -407,8 +412,13 @@
         let adminTab = "campaigns";
 
         function renderAdmin(container, db) {
-            const stateJson = btoa(JSON.stringify(db));
-            const shareableUrl = window.location.origin + window.location.pathname + "?state=" + encodeURIComponent(stateJson) + "#roleta/outubro";
+            let stateJson = "";
+            try {
+                stateJson = btoa(JSON.stringify(db));
+            } catch(e) {
+                stateJson = "";
+            }
+            const shareableUrl = window.location.origin + window.location.pathname + (stateJson ? "?state=" + encodeURIComponent(stateJson) : "") + "#admin";
 
             container.innerHTML = `
                 <div class="flex-1 flex flex-col bg-slate-900 text-white min-h-screen">
@@ -456,162 +466,166 @@
         }
 
         function renderAdminTabContent(db) {
-            if (adminTab === 'campaigns') {
-                return `
-                    <div class="space-y-6">
-                        <div class="flex justify-between items-center">
-                            <h2 class="text-2xl font-bold">Campanhas</h2>
-                            <button onclick="openNewCampaignModal()" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 px-4 py-2 rounded-xl font-bold text-sm">+ Nova Campanha</button>
-                        </div>
-                        <div class="grid gap-4">
-                            ${db.campaigns.map(c => `
-                                <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex justify-between items-center">
-                                    <div>
-                                        <h3 class="font-bold text-lg">${c.name}</h3>
-                                        <p class="text-sm text-yellow-400">Link: <a href="#roleta/${c.slug}" class="underline">/#roleta/${c.slug}</a></p>
-                                    </div>
-                                    <div class="flex items-center gap-3">
-                                        <button onclick="editCampaign(${c.id})" class="text-blue-400 hover:text-blue-300 p-2"><i class="fa-solid fa-pen"></i></button>
-                                        <span class="px-3 py-1 rounded-full text-xs font-bold ${c.active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}">${c.active ? 'Ativa' : 'Inativa'}</span>
-                                        <button onclick="deleteCampaign(${c.id})" class="text-red-400 hover:text-red-300 p-2"><i class="fa-solid fa-trash"></i></button>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                `;
-            } else if (adminTab === 'prizes') {
-                const activeCamp = db.campaigns[0];
-                const prizes = db.prizes.filter(p => p.campaignId === activeCamp.id);
-                const totalWeight = prizes.filter(p => p.active).reduce((sum, p) => sum + p.weight, 0);
-
-                return `
-                    <div class="space-y-6">
-                        <div class="flex justify-between items-center">
-                            <h2 class="text-2xl font-bold">Prêmios & Frases (${activeCamp.name})</h2>
-                            <button onclick="openNewPrizeModal(${activeCamp.id})" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 px-4 py-2 rounded-xl font-bold text-sm">+ Adicionar Prêmio / Frase</button>
-                        </div>
-                        <div class="grid gap-4">
-                            ${prizes.map(p => {
-                                const prob = totalWeight > 0 && p.active ? ((p.weight / totalWeight) * 100).toFixed(1) : 0;
-                                return `
+            try {
+                if (adminTab === 'campaigns') {
+                    return `
+                        <div class="space-y-6">
+                            <div class="flex justify-between items-center">
+                                <h2 class="text-2xl font-bold">Campanhas</h2>
+                                <button onclick="openNewCampaignModal()" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 px-4 py-2 rounded-xl font-bold text-sm">+ Nova Campanha</button>
+                            </div>
+                            <div class="grid gap-4">
+                                ${(db.campaigns || []).map(c => `
                                     <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex justify-between items-center">
                                         <div>
-                                            <h3 class="font-bold text-lg">${p.name}</h3>
-                                            <p class="text-sm text-slate-300">Texto na Roleta: <span class="font-semibold text-yellow-400">"${p.displayText}"</span> | Peso: ${p.weight} | Probabilidade: <span class="text-yellow-400 font-bold">${prob}%</span></p>
-                                            <p class="text-xs text-slate-500">Estoque: ${p.unlimitedQuantity ? 'Ilimitado' : p.quantity}</p>
+                                            <h3 class="font-bold text-lg">${c.name}</h3>
+                                            <p class="text-sm text-yellow-400">Link: <a href="#roleta/${c.slug}" class="underline">/#roleta/${c.slug}</a></p>
                                         </div>
                                         <div class="flex items-center gap-3">
-                                            <button onclick="editPrize(${p.id})" class="text-blue-400 hover:text-blue-300 p-2" title="Editar Prêmio"><i class="fa-solid fa-pen"></i></button>
-                                            <button onclick="togglePrize(${p.id})" class="px-3 py-1 rounded-full text-xs font-bold ${p.active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'}">${p.active ? 'Ativo' : 'Inativo'}</button>
-                                            <button onclick="deletePrize(${p.id})" class="text-red-400 hover:text-red-300 p-2"><i class="fa-solid fa-trash"></i></button>
+                                            <button onclick="editCampaign(${c.id})" class="text-blue-400 hover:text-blue-300 p-2"><i class="fa-solid fa-pen"></i></button>
+                                            <span class="px-3 py-1 rounded-full text-xs font-bold ${c.active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}">${c.active ? 'Ativa' : 'Inativa'}</span>
+                                            <button onclick="deleteCampaign(${c.id})" class="text-red-400 hover:text-red-300 p-2"><i class="fa-solid fa-trash"></i></button>
                                         </div>
                                     </div>
-                                `;
-                            }).join('')}
-                        </div>
-                    </div>
-                `;
-            } else if (adminTab === 'codes') {
-                const activeCamp = db.campaigns[0];
-                const codes = db.codes.filter(c => c.campaignId === activeCamp.id);
-
-                return `
-                    <div class="space-y-6">
-                        <div class="flex justify-between items-center">
-                            <h2 class="text-2xl font-bold">Códigos de Liberação</h2>
-                            <div class="flex gap-2">
-                                <button onclick="generateCodes(${activeCamp.id}, 50)" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 px-4 py-2 rounded-xl font-bold text-sm">+ Gerar 50 Códigos</button>
-                                <button onclick="exportCodesCSV()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl font-bold text-sm"><i class="fa-solid fa-download"></i> CSV</button>
+                                `).join('')}
                             </div>
                         </div>
-                        <div class="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
-                            <table class="w-full text-left border-collapse">
-                                <thead class="bg-slate-900 text-slate-400 text-xs uppercase">
-                                    <tr>
-                                        <th class="p-4">Código</th>
-                                        <th class="p-4">Status</th>
-                                        <th class="p-4">Utilizado em</th>
-                                        <th class="p-4 text-right">Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-slate-700 text-sm">
-                                    ${codes.map(c => `
+                    `;
+                } else if (adminTab === 'prizes') {
+                    const activeCamp = (db.campaigns || [])[0] || { id: 1, name: 'Outubro' };
+                    const prizes = (db.prizes || []).filter(p => p.campaignId === activeCamp.id);
+                    const totalWeight = prizes.filter(p => p.active).reduce((sum, p) => sum + p.weight, 0);
+
+                    return `
+                        <div class="space-y-6">
+                            <div class="flex justify-between items-center">
+                                <h2 class="text-2xl font-bold">Prêmios & Frases (${activeCamp.name})</h2>
+                                <button onclick="openNewPrizeModal(${activeCamp.id})" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 px-4 py-2 rounded-xl font-bold text-sm">+ Adicionar Prêmio / Frase</button>
+                            </div>
+                            <div class="grid gap-4">
+                                ${prizes.map(p => {
+                                    const prob = totalWeight > 0 && p.active ? ((p.weight / totalWeight) * 100).toFixed(1) : 0;
+                                    return `
+                                        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex justify-between items-center">
+                                            <div>
+                                                <h3 class="font-bold text-lg">${p.name}</h3>
+                                                <p class="text-sm text-slate-300">Texto na Roleta: <span class="font-semibold text-yellow-400">"${p.displayText}"</span> | Peso: ${p.weight} | Probabilidade: <span class="text-yellow-400 font-bold">${prob}%</span></p>
+                                                <p class="text-xs text-slate-500">Estoque: ${p.unlimitedQuantity ? 'Ilimitado' : p.quantity}</p>
+                                            </div>
+                                            <div class="flex items-center gap-3">
+                                                <button onclick="editPrize(${p.id})" class="text-blue-400 hover:text-blue-300 p-2" title="Editar Prêmio"><i class="fa-solid fa-pen"></i></button>
+                                                <button onclick="togglePrize(${p.id})" class="px-3 py-1 rounded-full text-xs font-bold ${p.active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'}">${p.active ? 'Ativo' : 'Inativo'}</button>
+                                                <button onclick="deletePrize(${p.id})" class="text-red-400 hover:text-red-300 p-2"><i class="fa-solid fa-trash"></i></button>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else if (adminTab === 'codes') {
+                    const activeCamp = (db.campaigns || [])[0] || { id: 1 };
+                    const codes = (db.codes || []).filter(c => c.campaignId === activeCamp.id);
+
+                    return `
+                        <div class="space-y-6">
+                            <div class="flex justify-between items-center">
+                                <h2 class="text-2xl font-bold">Códigos de Liberação</h2>
+                                <div class="flex gap-2">
+                                    <button onclick="generateCodes(${activeCamp.id}, 50)" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 px-4 py-2 rounded-xl font-bold text-sm">+ Gerar 50 Códigos</button>
+                                    <button onclick="exportCodesCSV()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl font-bold text-sm"><i class="fa-solid fa-download"></i> CSV</button>
+                                </div>
+                            </div>
+                            <div class="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
+                                <table class="w-full text-left border-collapse">
+                                    <thead class="bg-slate-900 text-slate-400 text-xs uppercase">
                                         <tr>
-                                            <td class="p-4 font-mono font-bold">${c.code}</td>
-                                            <td class="p-4">
-                                                <span class="px-2.5 py-1 rounded-full text-xs font-bold ${c.status === 'AVAILABLE' ? 'bg-emerald-500/20 text-emerald-400' : c.status === 'USED' ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-700 text-slate-400'}">${c.status}</span>
-                                            </td>
-                                            <td class="p-4 text-slate-400">${c.usedAt ? new Date(c.usedAt).toLocaleString() : '-'}</td>
-                                            <td class="p-4 text-right">
-                                                <button onclick="deleteCode(${c.id})" class="text-red-400 hover:text-red-300"><i class="fa-solid fa-trash"></i></button>
-                                            </td>
+                                            <th class="p-4">Código</th>
+                                            <th class="p-4">Status</th>
+                                            <th class="p-4">Utilizado em</th>
+                                            <th class="p-4 text-right">Ações</th>
                                         </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-700 text-sm">
+                                        ${codes.map(c => `
+                                            <tr>
+                                                <td class="p-4 font-mono font-bold">${c.code}</td>
+                                                <td class="p-4">
+                                                    <span class="px-2.5 py-1 rounded-full text-xs font-bold ${c.status === 'AVAILABLE' ? 'bg-emerald-500/20 text-emerald-400' : c.status === 'USED' ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-700 text-slate-400'}">${c.status}</span>
+                                                </td>
+                                                <td class="p-4 text-slate-400">${c.usedAt ? new Date(c.usedAt).toLocaleString() : '-'}</td>
+                                                <td class="p-4 text-right">
+                                                    <button onclick="deleteCode(${c.id})" class="text-red-400 hover:text-red-300"><i class="fa-solid fa-trash"></i></button>
+                                                </td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                    </div>
-                `;
-            } else if (adminTab === 'results') {
-                return `
-                    <div class="space-y-6">
-                        <div class="flex justify-between items-center">
-                            <h2 class="text-2xl font-bold">Resultados dos Giros</h2>
-                            <button onclick="exportResultsCSV()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl font-bold text-sm"><i class="fa-solid fa-download"></i> CSV</button>
-                        </div>
-                        <div class="grid gap-4">
-                            ${db.spins.map(s => `
-                                <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 space-y-4">
-                                    <div class="flex justify-between items-start">
-                                        <div>
-                                            <h3 class="font-bold text-lg text-yellow-400">${s.prizeNameSnapshot} (${s.discountSnapshot})</h3>
-                                            <p class="text-xs text-slate-400">${new Date(s.createdAt).toLocaleString()}</p>
+                    `;
+                } else if (adminTab === 'results') {
+                    return `
+                        <div class="space-y-6">
+                            <div class="flex justify-between items-center">
+                                <h2 class="text-2xl font-bold">Resultados dos Giros</h2>
+                                <button onclick="exportResultsCSV()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl font-bold text-sm"><i class="fa-solid fa-download"></i> CSV</button>
+                            </div>
+                            <div class="grid gap-4">
+                                ${(db.spins || []).map(s => `
+                                    <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 space-y-4">
+                                        <div class="flex justify-between items-start">
+                                            <div>
+                                                <h3 class="font-bold text-lg text-yellow-400">${s.prizeNameSnapshot} (${s.discountSnapshot})</h3>
+                                                <p class="text-xs text-slate-400">${new Date(s.createdAt).toLocaleString()}</p>
+                                            </div>
+                                        </div>
+                                        <div class="grid sm:grid-cols-2 gap-3">
+                                            <input type="text" value="${s.clientName || ''}" onchange="updateSpinClient(${s.id}, 'clientName', this.value)" placeholder="Nome do Cliente" class="bg-slate-900 border border-slate-700 px-3 py-2 rounded-xl text-sm">
+                                            <input type="text" value="${s.observation || ''}" onchange="updateSpinClient(${s.id}, 'observation', this.value)" placeholder="Observação" class="bg-slate-900 border border-slate-700 px-3 py-2 rounded-xl text-sm">
                                         </div>
                                     </div>
-                                    <div class="grid sm:grid-cols-2 gap-3">
-                                        <input type="text" value="${s.clientName || ''}" onchange="updateSpinClient(${s.id}, 'clientName', this.value)" placeholder="Nome do Cliente" class="bg-slate-900 border border-slate-700 px-3 py-2 rounded-xl text-sm">
-                                        <input type="text" value="${s.observation || ''}" onchange="updateSpinClient(${s.id}, 'observation', this.value)" placeholder="Observação" class="bg-slate-900 border border-slate-700 px-3 py-2 rounded-xl text-sm">
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else if (adminTab === 'settings') {
+                    const activeCamp = (db.campaigns || [])[0] || { id: 1 };
+                    const s = (db.settings || {})[activeCamp.id] || { title: "Roleta", subtitle: "", spin_button: "GIRAR", bg_color: "#060913", btn_color: "#FACC15" };
+
+                    return `
+                        <div class="space-y-6 max-w-xl">
+                            <h2 class="text-2xl font-bold">Configurações da Página</h2>
+                            <div class="space-y-4 bg-slate-800 p-6 rounded-2xl border border-slate-700">
+                                <div>
+                                    <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Título Principal</label>
+                                    <input type="text" id="st_title" value="${s.title || ''}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl">
+                                </div>
+                                <div>
+                                    <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Subtítulo</label>
+                                    <input type="text" id="st_subtitle" value="${s.subtitle || ''}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl">
+                                </div>
+                                <div>
+                                    <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Texto do Botão Girar</label>
+                                    <input type="text" id="st_spin_btn" value="${s.spin_button || ''}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl">
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Cor de Fundo (HEX)</label>
+                                        <input type="text" id="st_bg" value="${s.bg_color || ''}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Cor do Botão (HEX)</label>
+                                        <input type="text" id="st_btn" value="${s.btn_color || ''}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl">
                                     </div>
                                 </div>
-                            `).join('')}
+                                <button onclick="saveSettings(${activeCamp.id})" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 w-full py-3 rounded-xl font-bold">Salvar Configurações</button>
+                            </div>
                         </div>
-                    </div>
-                `;
-            } else if (adminTab === 'settings') {
-                const activeCamp = db.campaigns[0];
-                const s = db.settings[activeCamp.id] || db.settings[1];
-
-                return `
-                    <div class="space-y-6 max-w-xl">
-                        <h2 class="text-2xl font-bold">Configurações da Página</h2>
-                        <div class="space-y-4 bg-slate-800 p-6 rounded-2xl border border-slate-700">
-                            <div>
-                                <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Título Principal</label>
-                                <input type="text" id="st_title" value="${s.title}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl">
-                            </div>
-                            <div>
-                                <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Subtítulo</label>
-                                <input type="text" id="st_subtitle" value="${s.subtitle}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl">
-                            </div>
-                            <div>
-                                <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Texto do Botão Girar</label>
-                                <input type="text" id="st_spin_btn" value="${s.spin_button}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl">
-                            </div>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Cor de Fundo (HEX)</label>
-                                    <input type="text" id="st_bg" value="${s.bg_color}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl">
-                                </div>
-                                <div>
-                                    <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Cor do Botão (HEX)</label>
-                                    <input type="text" id="st_btn" value="${s.btn_color}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl">
-                                </div>
-                            </div>
-                            <button onclick="saveSettings(${activeCamp.id})" class="bg-yellow-500 hover:bg-yellow-400 text-slate-950 w-full py-3 rounded-xl font-bold">Salvar Configurações</button>
-                        </div>
-                    </div>
-                `;
+                    `;
+                }
+            } catch (e) {
+                return `<div class="p-6 text-red-400">Erro ao renderizar aba: ${e.message}</div>`;
             }
         }
 
@@ -623,7 +637,9 @@
 
             const db = loadDB();
             const newId = Date.now();
+            if (!db.campaigns) db.campaigns = [];
             db.campaigns.push({ id: newId, name, slug, active: true });
+            if (!db.settings) db.settings = {};
             db.settings[newId] = { ...db.settings[1], title: name };
             saveDB(db);
             router();
@@ -661,6 +677,7 @@
             const quantity = parseInt(prompt("Quantidade em estoque:", "100")) || 100;
 
             const db = loadDB();
+            if (!db.prizes) db.prizes = [];
             db.prizes.push({
                 id: Date.now(),
                 campaignId,
@@ -721,6 +738,7 @@
         function generateCodes(campaignId, count) {
             const db = loadDB();
             const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            if (!db.codes) db.codes = [];
             for (let i = 0; i < count; i++) {
                 let code = "RLT-";
                 for (let j = 0; j < 6; j++) {
@@ -756,6 +774,7 @@
 
         function saveSettings(campaignId) {
             const db = loadDB();
+            if (!db.settings) db.settings = {};
             if (!db.settings[campaignId]) db.settings[campaignId] = { ...db.settings[1] };
             db.settings[campaignId].title = document.getElementById("st_title").value;
             db.settings[campaignId].subtitle = document.getElementById("st_subtitle").value;
@@ -770,7 +789,7 @@
         function exportCodesCSV() {
             const db = loadDB();
             let csv = "Codigo,Status,DataUtilizacao\n";
-            db.codes.forEach(c => {
+            (db.codes || []).forEach(c => {
                 csv += `${c.code},${c.status},${c.usedAt ? new Date(c.usedAt).toISOString() : ''}\n`;
             });
             downloadCSV(csv, "codigos_roleta.csv");
@@ -779,7 +798,7 @@
         function exportResultsCSV() {
             const db = loadDB();
             let csv = "Codigo,Cliente,Premio,Valor,Data,Observacao\n";
-            db.spins.forEach(s => {
+            (db.spins || []).forEach(s => {
                 csv += `"${s.accessCodeId}","${s.clientName || ''}","${s.prizeNameSnapshot}","${s.discountSnapshot}","${new Date(s.createdAt).toISOString()}","${s.observation || ''}"\n`;
             });
             downloadCSV(csv, "resultados_giros.csv");

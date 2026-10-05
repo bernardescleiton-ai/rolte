@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roleta da Sorte</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-950 text-white min-h-screen flex flex-col">
+
+    <!-- App Container -->
+    <div id="app" class="flex-1 flex flex-col">
+        <!-- Rendered dynamically by JS -->
+    </div>
+
+    <script>
+        // --- Database & LocalStorage State Management ---
+        const DB_KEY = "roleta_db_v1";
+
+        function getInitialData() {
+            return {
+                campaigns: [
+                    { id: 1, name: "Outubro Premiado", slug: "outubro", active: true }
+                ],
+                prizes: [
+                    { id: 1, campaignId: 1, name: "5% de Desconto", description: "Desconto em compras acima de R$ 50", displayText: "5%", resultText: "5% DE DESCONTO", discount: "5%", weight: 40, quantity: 500, unlimitedQuantity: false, active: true },
+                    { id: 2, campaignId: 1, name: "10% de Desconto", description: "Desconto em qualquer produto", displayText: "10%", resultText: "10% DE DESCONTO", discount: "10%", weight: 30, quantity: 200, unlimitedQuantity: false, active: true },
+                    { id: 3, campaignId: 1, name: "15% de Desconto", description: "Desconto especial", displayText: "15%", resultText: "15% DE DESCONTO", discount: "15%", weight: 20, quantity: 50, unlimitedQuantity: false, active: true },
+                    { id: 4, campaignId: 1, name: "20% de Desconto", description: "Super desconto exclusivo", displayText: "20%", resultText: "20% DE DESCONTO", discount: "20%", weight: 8, quantity: 20, unlimitedQuantity: false, active: true },
+                    { id: 5, campaignId: 1, name: "50% de Desconto", description: "Prêmio máximo da roleta!", displayText: "50%", resultText: "50% DE DESCONTO", discount: "50%", weight: 2, quantity: 5, unlimitedQuantity: false, active: true }
+                ],
+                codes: [
+                    { id: 1, campaignId: 1, code: "RLT-7X92KP", status: "AVAILABLE", usedAt: null },
+                    { id: 2, campaignId: 1, code: "RLT-4M8Q2A", status: "AVAILABLE", usedAt: null },
+                    { id: 3, campaignId: 1, code: "RLT-9ZK31B", status: "AVAILABLE", usedAt: null },
+                    { id: 4, campaignId: 1, code: "RLT-2P7X8M", status: "AVAILABLE", usedAt: null },
+                    { id: 5, campaignId: 1, code: "RLT-TEST01", status: "AVAILABLE", usedAt: null }
+                ],
+                spins: [],
+                settings: {
+                    1: {
+                        title: "Gire e Ganhe!",
+                        subtitle: "Você tem uma chance de ganhar um desconto exclusivo.",
+                        code_placeholder: "Digite seu código (ex: RLT-7X92KP)",
+                        liberate_button: "LIBERAR ROLETA",
+                        valid_code_msg: "Código validado com sucesso!",
+                        spin_button: "GIRAR AGORA",
+                        spinning_msg: "Girando roleta...",
+                        result_title: "🎉 PARABÉNS! 🎉",
+                        result_prize_prefix: "VOCÊ GANHOU",
+                        result_success_msg: "Seu prêmio foi registrado com sucesso no sistema.",
+                        bg_color: "#0F172A",
+                        text_color: "#FFFFFF",
+                        btn_color: "#10B981",
+                        btn_text_color: "#FFFFFF"
+                    }
+                }
+            };
+        }
+
+        function loadDB() {
+            const data = localStorage.getItem(DB_KEY);
+            if (!data) {
+                const initial = getInitialData();
+                saveDB(initial);
+                return initial;
+            }
+            try {
+                return JSON.parse(data);
+            } catch (e) {
+                const initial = getInitialData();
+                saveDB(initial);
+                return initial;
+            }
+        }
+
+        function saveDB(db) {
+            localStorage.setItem(DB_KEY, JSON.stringify(db));
+        }
+
+        // --- Router & App State ---
+        let currentCodeObj = null;
+        let isSpinning = false;
+        let lastWonPrize = null;
+
+        function router() {
+            const hash = window.location.hash; // e.g. #admin or #roleta/outubro
+            const app = document.getElementById("app");
+            const db = loadDB();
+
+            if (hash.startsWith("#admin")) {
+                renderAdmin(app, db);
+            } else {
+                // Public roleta
+                let slug = "outubro";
+                if (hash.startsWith("#roleta/")) {
+                    slug = hash.replace("#roleta/", "");
+                }
+                const campaign = db.campaigns.find(c => c.slug === slug) || db.campaigns[0];
+                renderPublicRoleta(app, db, campaign);
+            }
+        }
+
+        window.addEventListener("hashchange", router);
+        window.addEventListener("load", router);
+
+        // --- Public Roleta Screen ---
+        function renderPublicRoleta(container, db, campaign) {
+            if (!campaign || !campaign.active) {
+                container.innerHTML = `
+                    <div class="flex-1 flex items-center justify-center p-6 text-center">
+                        <div class="bg-slate-900 p-8 rounded-2xl shadow-xl max-w-md w-full border border-slate-800">
+                            <h1 class="text-2xl font-bold text-red-500 mb-2">Campanha Indisponível</h1>
+                            <p class="text-slate-400">Esta campanha de prêmios está encerrada ou não existe.</p>
+                            <a href="#admin" class="mt-6 inline-block bg-emerald-600 text-white px-6 py-2 rounded-xl font-bold">Ir para o Painel Admin</a>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            const settings = db.settings[campaign.id] || db.settings[1];
+            const prizes = db.prizes.filter(p => p.campaignId === campaign.id && p.active && (p.unlimitedQuantity || p.quantity > 0));
+
+            container.innerHTML = `
+                <div class="flex-1 flex flex-col items-center justify-center p-4 relative" style="background-color: ${settings.bg_color}; color: ${settings.text_color};">
+                    <!-- Admin Button Top Right -->
+                    <div class="absolute top-4 right-4">
+                        <a href="#admin" class="bg-slate-800/80 hover:bg-slate-700 text-slate-300 p-3 rounded-full shadow-lg transition flex items-center gap-2 text-sm font-semibold">
+                            <i class="fa-solid fa-gear"></i> <span class="hidden sm:inline">Admin</span>
+                        </a>
+                    </div>
+
+                    <div class="max-w-md w-full text-center px-4">
+                        <h1 class="text-3xl font-extrabold mb-2">${settings.title}</h1>
+                        <p class="text-sm opacity-80 mb-8">${settings.subtitle}</p>
+
+                        <!-- Wheel Container -->
+                        <div class="relative w-72 h-72 mx-auto mb-8 flex items-center justify-center">
+                            <canvas id="wheelCanvas" width="280" height="280" class="w-full h-full rounded-full shadow-2xl transition-transform duration-1000"></canvas>
+                            <!-- Pointer -->
+                            <div class="absolute -top-3 w-8 h-8 bg-red-500 clip-polygon shadow-lg rounded-full flex items-center justify-center border-2 border-white">
+                                <i class="fa-solid fa-star text-white text-xs"></i>
+                            </div>
+                        </div>
+
+                        <!-- Interaction Area -->
+                        <div id="interactionArea">
+                            ${!currentCodeObj ? `
+                                <div class="space-y-4">
+                                    <input type="text" id="codeInput" placeholder="${settings.code_placeholder}" class="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 text-center font-bold tracking-wider uppercase">
+                                    <button onclick="validateCode(${campaign.id})" style="background-color: ${settings.btn_color}; color: ${settings.btn_text_color};" class="w-full py-4 rounded-xl font-extrabold shadow-lg hover:opacity-90 transition">
+                                        ${settings.liberate_button}
+                                    </button>
+                                    <div id="codeError" class="text-red-400 text-sm font-medium"></div>
+                                </div>
+                            ` : !lastWonPrize ? `
+                                <div class="space-y-4">
+                                    <p class="text-emerald-400 font-bold">${settings.valid_code_msg}</p>
+                                    <button onclick="spinWheel(${campaign.id})" id="spinBtn" style="background-color: ${settings.btn_color}; color: ${settings.btn_text_color};" class="w-full py-4 rounded-xl font-extrabold shadow-lg hover:opacity-90 transition text-lg">
+                                        ${settings.spin_button}
+                                    </button>
+                                </div>
+                            ` : `
+                                <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-2xl space-y-4">
+                                    <h2 class="text-2xl font-extrabold text-emerald-400">${settings.result_title}</h2>
+                                    <p class="text-xs uppercase tracking-widest opacity-70">${settings.result_prize_prefix}</p>
+                                    <div class="text-3xl font-black text-yellow-400">${lastWonPrize.resultText || lastWonPrize.name}</div>
+                                    <p class="text-sm text-slate-300">${lastWonPrize.description}</p>
+                                    <p class="text-xs text-slate-500 mt-2">${settings.result_success_msg}</p>
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            drawWheel(prizes, 0);
+        }
+
+        function drawWheel(prizes, rotationAngle) {
+            const canvas = document.getElementById("wheelCanvas");
+            if (!canvas) return;
+            const ctx = canvas.getContext("2d");
+            const width = canvas.width;
+            const height = canvas.height;
+            const center = width / 2;
+            const radius = center - 10;
+
+            ctx.clearRect(0, 0, width, height);
+
+            if (prizes.length === 0) return;
+
+            const sliceAngle = (2 * Math.PI) / prizes.length;
+            const colors = ["#3B82F6", "#8B5CF6", "#EC4899", "#F59E0B", "#10B981", "#6366F1", "#14B8A6"];
+
+            ctx.save();
+            ctx.translate(center, center);
+            ctx.rotate(rotationAngle);
+            ctx.translate(-center, -center);
+
+            prizes.forEach((prize, i) => {
+                const startAngle = i * sliceAngle;
+                const endAngle = (i + 1) * sliceAngle;
+
+                ctx.beginPath();
+                ctx.moveTo(center, center);
+                ctx.arc(center, center, radius, startAngle, endAngle);
+                ctx.closePath();
+
+                ctx.fillStyle = colors[i % colors.length];
+                ctx.fill();
+                ctx.strokeStyle = "#0F172A";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Draw text
+                ctx.save();
+                ctx.translate(center, center);
+                ctx.rotate(startAngle + sliceAngle / 2);
+                ctx.textAlign = "right";
+                ctx.fillStyle = "#FFFFFF";
+                ctx.font = "bold 14px sans-serif";
+                ctx.fillText(prize.displayText || prize.name, radius - 20, 5);
+                ctx.restore();
+            });
+
+            ctx.restore();
+        }
+
+        function validateCode(campaignId) {
+            const input = document.getElementById("codeInput").value.trim().toUpperCase();
+            const db = loadDB();
+            const errDiv = document.getElementById("codeError");
+
+            if (!input) {
+                errDiv.innerText = "Por favor, digite um código.";
+                return;
+            }
+
+            const codeObj = db.codes.find(c => c.campaignId === campaignId && c.code === input);
+            if (!codeObj) {
+                errDiv.innerText = "Código inválido.";
+                return;
+            }
+
+            if (codeObj.status === "USED") {
+                errDiv.innerText = "Este código já foi utilizado.";
+                return;
+            }
+
+            if (codeObj.status === "INACTIVE") {
+                errDiv.innerText = "Este código está inativo.";
+                return;
+            }
+
+            currentCodeObj = codeObj;
+            errDiv.innerText = "";
+            router();
+        }
+
+        function spinWheel(campaignId) {
+            if (isSpinning || !currentCodeObj) return;
+            isSpinning = true;
+
+            const db = loadDB();
+            const prizes = db.prizes.filter(p => p.campaignId === campaignId && p.active && (p.unlimitedQuantity || p.quantity > 0));
+
+            if (prizes.length === 0) {
+                alert("Nenhum prêmio disponível.");
+                isSpinning = false;
+                return;
+            }
+
+            // Weighted lottery
+            const totalWeight = prizes.reduce((sum, p) => sum + p.weight, 0);
+            let randomWeight = Math.floor(Math.random() * totalWeight);
+            let selectedPrize = prizes[0];
+
+            for (let p of prizes) {
+                if (randomWeight < p.weight) {
+                    selectedPrize = p;
+                    break;
+                }
+                randomWeight -= p.weight;
+            }
+
+            // Update Code status
+            const codeIndex = db.codes.findIndex(c => c.id === currentCodeObj.id);
+            if (codeIndex !== -1) {
+                db.codes[codeIndex].status = "USED";
+                db.codes[codeIndex].usedAt = Date.now();
+            }
+
+            // Update Prize quantity
+            if (!selectedPrize.unlimitedQuantity && selectedPrize.quantity > 0) {
+                const prizeIndex = db.prizes.findIndex(p => p.id === selectedPrize.id);
+                if (prizeIndex !== -1) {
+                    db.prizes[prizeIndex].quantity -= 1;
+                    if (db.prizes[prizeIndex].quantity === 0) {
+                        db.prizes[prizeIndex].active = false;
+                    }
+                }
+            }
+
+            // Record spin
+            const newSpin = {
+                id: Date.now(),
+                campaignId: campaignId,
+                accessCodeId: currentCodeObj.id,
+                prizeId: selectedPrize.id,
+                clientName: "",
+                observation: "",
+                prizeNameSnapshot: selectedPrize.name,
+                discountSnapshot: selectedPrize.discount,
+                createdAt: Date.now()
+            };
+            db.spins.unshift(newSpin);
+            saveDB(db);
+
+            // Animate wheel
+            const prizeIndex = prizes.findIndex(p => p.id === selectedPrize.id);
+            const sliceAngle = 360 / prizes.length;
+            const targetAngle = 360 * 5 + (360 - (prizeIndex * sliceAngle + sliceAngle / 2));
+
+            const canvas = document.getElementById("wheelCanvas");
+            if (canvas) {
+                canvas.style.transform = `rotate(${targetAngle}deg)`;
+            }
+
+            setTimeout(() => {
+                isSpinning = false;
+                lastWonPrize = selectedPrize;
+                router();
+            }, 5000);
+        }
+
+        // --- Admin Panel ---
+        let adminTab = "campaigns";
+
+        function renderAdmin(container, db) {
+            container.innerHTML = `
+                <div class="flex-1 flex flex-col bg-slate-900 text-white">
+                    <!-- Top Bar -->
+                    <header class="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center">
+                        <h1 class="text-xl font-bold flex items-center gap-2">
+                            <i class="fa-solid fa-gauge-high text-emerald-500"></i> Painel Administrativo
+                        </h1>
+                        <a href="#roleta/outubro" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold transition flex items-center gap-2">
+                            <i class="fa-solid fa-eye"></i> Ver Roleta Pública
+                        </a>
+                    </header>
+
+                    <!-- Navigation Tabs -->
+                    <div class="bg-slate-900 border-b border-slate-800 flex overflow-x-auto px-4 gap-2">
+                        <button onclick="setAdminTab('campaigns')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'campaigns' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400'}">Campanhas</button>
+                        <button onclick="setAdminTab('prizes')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'prizes' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400'}">Prêmios</button>
+                        <button onclick="setAdminTab('codes')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'codes' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400'}">Códigos</button>
+                        <button onclick="setAdminTab('results')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'results' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400'}">Resultados</button>
+                        <button onclick="setAdminTab('settings')" class="px-4 py-3 font-semibold text-sm border-b-2 ${adminTab === 'settings' ? 'border-emerald-500 text-emerald-400' : 'border-transparent text-slate-400'}">Configurações</button>
+                    </div>
+
+                    <!-- Tab Content -->
+                    <main class="flex-1 p-6 overflow-y-auto max-w-5xl w-full mx-auto" id="adminContent">
+                        ${renderAdminTabContent(db)}
+                    </main>
+                </div>
+            `;
+        }
+
+        function setAdminTab(tab) {
+            adminTab = tab;
+            router();
+        }
+
+        function renderAdminTabContent(db) {
+            if (adminTab === 'campaigns') {
+                return `
+                    <div class="space-y-6">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-2xl font-bold">Campanhas</h2>
+                            <button onclick="openNewCampaignModal()" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl font-bold text-sm">+ Nova Campanha</button>
+                        </div>
+                        <div class="grid gap-4">
+                            ${db.campaigns.map(c => `
+                                <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex justify-between items-center">
+                                    <div>
+                                        <h3 class="font-bold text-lg">${c.name}</h3>
+                                        <p class="text-sm text-emerald-400">Link: <a href="#roleta/${c.slug}" class="underline">/#roleta/${c.slug}</a></p>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <span class="px-3 py-1 rounded-full text-xs font-bold ${c.active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}">${c.active ? 'Ativa' : 'Inativa'}</span>
+                                        <button onclick="deleteCampaign(${c.id})" class="text-red-400 hover:text-red-300 p-2"><i class="fa-solid fa-trash"></i></button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            } else if (adminTab === 'prizes') {
+                const activeCamp = db.campaigns[0];
+                const prizes = db.prizes.filter(p => p.campaignId === activeCamp.id);
+                const totalWeight = prizes.filter(p => p.active).reduce((sum, p) => sum + p.weight, 0);
+
+                return `
+                    <div class="space-y-6">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-2xl font-bold">Prêmios (${activeCamp.name})</h2>
+                            <button onclick="openNewPrizeModal(${activeCamp.id})" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl font-bold text-sm">+ Adicionar Prêmio</button>
+                        </div>
+                        <div class="grid gap-4">
+                            ${prizes.map(p => {
+                                const prob = totalWeight > 0 && p.active ? ((p.weight / totalWeight) * 100).toFixed(1) : 0;
+                                return `
+                                    <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 flex justify-between items-center">
+                                        <div>
+                                            <h3 class="font-bold text-lg">${p.name}</h3>
+                                            <p class="text-sm text-slate-400">Desconto: ${p.discount} | Peso: ${p.weight} | Probabilidade: <span class="text-emerald-400 font-bold">${prob}%</span></p>
+                                            <p class="text-xs text-slate-500">Estoque: ${p.unlimitedQuantity ? 'Ilimitado' : p.quantity}</p>
+                                        </div>
+                                        <div class="flex items-center gap-3">
+                                            <button onclick="togglePrize(${p.id})" class="px-3 py-1 rounded-full text-xs font-bold ${p.active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'}">${p.active ? 'Ativo' : 'Inativo'}</button>
+                                            <button onclick="deletePrize(${p.id})" class="text-red-400 hover:text-red-300 p-2"><i class="fa-solid fa-trash"></i></button>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                `;
+            } else if (adminTab === 'codes') {
+                const activeCamp = db.campaigns[0];
+                const codes = db.codes.filter(c => c.campaignId === activeCamp.id);
+
+                return `
+                    <div class="space-y-6">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-2xl font-bold">Códigos de Liberação</h2>
+                            <div class="flex gap-2">
+                                <button onclick="generateCodes(${activeCamp.id}, 50)" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-xl font-bold text-sm">+ Gerar 50 Códigos</button>
+                                <button onclick="exportCodesCSV()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl font-bold text-sm"><i class="fa-solid fa-download"></i> CSV</button>
+                            </div>
+                        </div>
+                        <div class="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden">
+                            <table class="w-full text-left border-collapse">
+                                <thead class="bg-slate-900 text-slate-400 text-xs uppercase">
+                                    <tr>
+                                        <th class="p-4">Código</th>
+                                        <th class="p-4">Status</th>
+                                        <th class="p-4">Utilizado em</th>
+                                        <th class="p-4 text-right">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-700 text-sm">
+                                    ${codes.map(c => `
+                                        <tr>
+                                            <td class="p-4 font-mono font-bold">${c.code}</td>
+                                            <td class="p-4">
+                                                <span class="px-2.5 py-1 rounded-full text-xs font-bold ${c.status === 'AVAILABLE' ? 'bg-emerald-500/20 text-emerald-400' : c.status === 'USED' ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-700 text-slate-400'}">${c.status}</span>
+                                            </td>
+                                            <td class="p-4 text-slate-400">${c.usedAt ? new Date(c.usedAt).toLocaleString() : '-'}</td>
+                                            <td class="p-4 text-right">
+                                                <button onclick="deleteCode(${c.id})" class="text-red-400 hover:text-red-300"><i class="fa-solid fa-trash"></i></button>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            } else if (adminTab === 'results') {
+                return `
+                    <div class="space-y-6">
+                        <div class="flex justify-between items-center">
+                            <h2 class="text-2xl font-bold">Resultados dos Giros</h2>
+                            <button onclick="exportResultsCSV()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl font-bold text-sm"><i class="fa-solid fa-download"></i> CSV</button>
+                        </div>
+                        <div class="grid gap-4">
+                            ${db.spins.map(s => `
+                                <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 space-y-4">
+                                    <div class="flex justify-between items-start">
+                                        <div>
+                                            <h3 class="font-bold text-lg text-emerald-400">${s.prizeNameSnapshot} (${s.discountSnapshot})</h3>
+                                            <p class="text-xs text-slate-400">${new Date(s.createdAt).toLocaleString()}</p>
+                                        </div>
+                                    </div>
+                                    <div class="grid sm:grid-cols-2 gap-3">
+                                        <input type="text" value="${s.clientName || ''}" onchange="updateSpinClient(${s.id}, 'clientName', this.value)" placeholder="Nome do Cliente" class="bg-slate-900 border border-slate-700 px-3 py-2 rounded-xl text-sm">
+                                        <input type="text" value="${s.observation || ''}" onchange="updateSpinClient(${s.id}, 'observation', this.value)" placeholder="Observação" class="bg-slate-900 border border-slate-700 px-3 py-2 rounded-xl text-sm">
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            } else if (adminTab === 'settings') {
+                const activeCamp = db.campaigns[0];
+                const s = db.settings[activeCamp.id] || db.settings[1];
+
+                return `
+                    <div class="space-y-6 max-w-xl">
+                        <h2 class="text-2xl font-bold">Configurações da Página</h2>
+                        <div class="space-y-4 bg-slate-800 p-6 rounded-2xl border border-slate-700">
+                            <div>
+                                <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Título Principal</label>
+                                <input type="text" id="st_title" value="${s.title}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl">
+                            </div>
+                            <div>
+                                <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Subtítulo</label>
+                                <input type="text" id="st_subtitle" value="${s.subtitle}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl">
+                            </div>
+                            <div>
+                                <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Texto do Botão Girar</label>
+                                <input type="text" id="st_spin_btn" value="${s.spin_button}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Cor de Fundo (HEX)</label>
+                                    <input type="text" id="st_bg" value="${s.bg_color}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl">
+                                </div>
+                                <div>
+                                    <label class="block text-xs uppercase font-bold text-slate-400 mb-1">Cor do Botão (HEX)</label>
+                                    <input type="text" id="st_btn" value="${s.btn_color}" class="w-full bg-slate-900 border border-slate-700 px-4 py-2 rounded-xl">
+                                </div>
+                            </div>
+                            <button onclick="saveSettings(${activeCamp.id})" class="bg-emerald-600 hover:bg-emerald-500 w-full py-3 rounded-xl font-bold">Salvar Configurações</button>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // --- Admin Actions ---
+        function openNewCampaignModal() {
+            const name = prompt("Nome da Campanha:");
+            if (!name) return;
+            const slug = prompt("Slug da URL (ex: promocao-1):", name.toLowerCase().replace(/[^a-z0-9]/g, "-"));
+            if (!slug) return;
+
+            const db = loadDB();
+            const newId = Date.now();
+            db.campaigns.push({ id: newId, name, slug, active: true });
+            db.settings[newId] = { ...db.settings[1], title: name };
+            saveDB(db);
+            router();
+        }
+
+        function deleteCampaign(id) {
+            const db = loadDB();
+            db.campaigns = db.campaigns.filter(c => c.id !== id);
+            saveDB(db);
+            router();
+        }
+
+        function openNewPrizeModal(campaignId) {
+            const name = prompt("Nome do Prêmio (ex: 20% de Desconto):");
+            if (!name) return;
+            const discount = prompt("Valor do Desconto (ex: 20%):", "20%");
+            const weight = parseInt(prompt("Peso (ex: 15):", "15")) || 10;
+            const quantity = parseInt(prompt("Quantidade em estoque:", "100")) || 100;
+
+            const db = loadDB();
+            db.prizes.push({
+                id: Date.now(),
+                campaignId,
+                name,
+                description: "Prêmio promocional exclusivo",
+                displayText: discount,
+                resultText: `${discount} DE DESCONTO`,
+                discount,
+                weight,
+                quantity,
+                unlimitedQuantity: false,
+                active: true
+            });
+            saveDB(db);
+            router();
+        }
+
+        function togglePrize(id) {
+            const db = loadDB();
+            const p = db.prizes.find(x => x.id === id);
+            if (p) p.active = !p.active;
+            saveDB(db);
+            router();
+        }
+
+        function deletePrize(id) {
+            const db = loadDB();
+            db.prizes = db.prizes.filter(p => p.id !== id);
+            saveDB(db);
+            router();
+        }
+
+        function generateCodes(campaignId, count) {
+            const db = loadDB();
+            const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            for (let i = 0; i < count; i++) {
+                let code = "RLT-";
+                for (let j = 0; j < 6; j++) {
+                    code += charset.charAt(Math.floor(Math.random() * charset.length));
+                }
+                db.codes.push({
+                    id: Date.now() + Math.random(),
+                    campaignId,
+                    code,
+                    status: "AVAILABLE",
+                    usedAt: null
+                });
+            }
+            saveDB(db);
+            router();
+        }
+
+        function deleteCode(id) {
+            const db = loadDB();
+            db.codes = db.codes.filter(c => c.id !== id);
+            saveDB(db);
+            router();
+        }
+
+        function updateSpinClient(id, field, value) {
+            const db = loadDB();
+            const spin = db.spins.find(s => s.id === id);
+            if (spin) {
+                spin[field] = value;
+                saveDB(db);
+            }
+        }
+
+        function saveSettings(campaignId) {
+            const db = loadDB();
+            if (!db.settings[campaignId]) db.settings[campaignId] = { ...db.settings[1] };
+            db.settings[campaignId].title = document.getElementById("st_title").value;
+            db.settings[campaignId].subtitle = document.getElementById("st_subtitle").value;
+            db.settings[campaignId].spin_button = document.getElementById("st_spin_btn").value;
+            db.settings[campaignId].bg_color = document.getElementById("st_bg").value;
+            db.settings[campaignId].btn_color = document.getElementById("st_btn").value;
+            saveDB(db);
+            alert("Configurações salvas com sucesso!");
+            router();
+        }
+
+        function exportCodesCSV() {
+            const db = loadDB();
+            let csv = "Codigo,Status,DataUtilizacao\n";
+            db.codes.forEach(c => {
+                csv += `${c.code},${c.status},${c.usedAt ? new Date(c.usedAt).toISOString() : ''}\n`;
+            });
+            downloadCSV(csv, "codigos_roleta.csv");
+        }
+
+        function exportResultsCSV() {
+            const db = loadDB();
+            let csv = "Codigo,Cliente,Premio,Desconto,Data,Observacao\n";
+            db.spins.forEach(s => {
+                csv += `"${s.accessCodeId}","${s.clientName || ''}","${s.prizeNameSnapshot}","${s.discountSnapshot}","${new Date(s.createdAt).toISOString()}","${s.observation || ''}"\n`;
+            });
+            downloadCSV(csv, "resultados_giros.csv");
+        }
+
+        function downloadCSV(csv, filename) {
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', filename);
+            a.style.visibility = 'hidden';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+    </script>
+    <style>
+        .clip-polygon {
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+        }
+    </style>
+</body>
+</html>

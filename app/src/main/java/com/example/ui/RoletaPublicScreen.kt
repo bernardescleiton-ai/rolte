@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -70,6 +71,22 @@ fun RoletaPublicScreen(
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
+        // Admin button in top right
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp),
+            contentAlignment = Alignment.TopEnd
+        ) {
+            IconButton(onClick = onNavigateAdmin) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Painel Administrativo",
+                    tint = textColor.copy(alpha = 0.7f)
+                )
+            }
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()

@@ -47,11 +47,11 @@
                     { id: 1, name: "Outubro Premiado", slug: "outubro", active: true }
                 ],
                 prizes: [
-                    { id: 1, campaignId: 1, name: "R$ 5 de Desconto", description: "Desconto em compras acima de R$ 50", displayText: "R$ 5 OFF", resultText: "R$ 5 DE DESCONTO", discount: "R$ 5", weight: 40, quantity: 500, unlimitedQuantity: false, active: true },
-                    { id: 2, campaignId: 1, name: "Frete Grátis", description: "Frete grátis para todo o Brasil", displayText: "Frete Grátis", resultText: "FRETE GRÁTIS", discount: "Frete Grátis", weight: 30, quantity: 200, unlimitedQuantity: false, active: true },
-                    { id: 3, campaignId: 1, name: "R$ 20 de Desconto", description: "Desconto especial em qualquer produto", displayText: "R$ 20 OFF", resultText: "R$ 20 DE DESCONTO", discount: "R$ 20", weight: 20, quantity: 50, unlimitedQuantity: false, active: true },
-                    { id: 4, campaignId: 1, name: "Brinde Surpresa", description: "Um brinde exclusivo no seu pedido", displayText: "Brinde", resultText: "BRINDE SURPRESA", discount: "Brinde", weight: 8, quantity: 20, unlimitedQuantity: false, active: true },
-                    { id: 5, campaignId: 1, name: "R$ 100 de Desconto", description: "Prêmio máximo da roleta!", displayText: "R$ 100 OFF", resultText: "R$ 100 DE DESCONTO", discount: "R$ 100", weight: 2, quantity: 5, unlimitedQuantity: false, active: true }
+                    { id: 1, campaignId: 1, name: "5% de Desconto", description: "Desconto em compras acima de R$ 50", displayText: "5%", resultText: "5% DE DESCONTO", discount: "5%", weight: 40, quantity: 500, unlimitedQuantity: false, active: true },
+                    { id: 2, campaignId: 1, name: "10% de Desconto", description: "Desconto em qualquer produto", displayText: "10%", resultText: "10% DE DESCONTO", discount: "10%", weight: 30, quantity: 200, unlimitedQuantity: false, active: true },
+                    { id: 3, campaignId: 1, name: "15% de Desconto", description: "Desconto especial de primavera", displayText: "15%", resultText: "15% DE DESCONTO", discount: "15%", weight: 20, quantity: 50, unlimitedQuantity: false, active: true },
+                    { id: 4, campaignId: 1, name: "20% de Desconto", description: "Super desconto exclusivo", displayText: "20%", resultText: "20% DE DESCONTO", discount: "20%", weight: 8, quantity: 20, unlimitedQuantity: false, active: true },
+                    { id: 5, campaignId: 1, name: "50% de Desconto", description: "Prêmio máximo da roleta!", displayText: "50%", resultText: "50% DE DESCONTO", discount: "50%", weight: 2, quantity: 5, unlimitedQuantity: false, active: true }
                 ],
                 codes: [
                     { id: 1, campaignId: 1, code: "RLT-7X92KP", status: "AVAILABLE", usedAt: null },
@@ -738,7 +738,7 @@
         function exportCodesCSV() {
             const db = loadDB();
             let csv = "Codigo,Status,DataUtilizacao\n";
-            db.codes.forEach(c => {
+            db.codes.codes.forEach(c => {
                 csv += `${c.code},${c.status},${c.usedAt ? new Date(c.usedAt).toISOString() : ''}\n`;
             });
             downloadCSV(csv, "codigos_roleta.csv");

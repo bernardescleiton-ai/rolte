@@ -1,7 +1,6 @@
 package com.example.data
 
 import androidx.room.Dao
-import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -111,28 +110,4 @@ interface SettingDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdateSetting(setting: SettingEntity)
-}
-
-@Dao
-interface ClientDao {
-    @Query("SELECT * FROM clients WHERE campaignId = :campaignId ORDER BY id DESC")
-    fun getClientsForCampaign(campaignId: Long): Flow<List<ClientEntity>>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertClient(client: ClientEntity): Long
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertClients(clients: List<ClientEntity>)
-
-    @Update
-    suspend fun updateClient(client: ClientEntity)
-
-    @Delete
-    suspend fun deleteClient(client: ClientEntity)
-
-    @Query("DELETE FROM clients WHERE id IN (:ids)")
-    suspend fun deleteClients(ids: List<Long>)
-
-    @Query("DELETE FROM clients WHERE campaignId = :campaignId")
-    suspend fun clearClientsForCampaign(campaignId: Long)
 }

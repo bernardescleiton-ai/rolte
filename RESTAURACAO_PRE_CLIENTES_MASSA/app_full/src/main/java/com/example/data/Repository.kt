@@ -8,7 +8,6 @@ class Repository(private val db: AppDatabase) {
     val accessCodeDao = db.accessCodeDao()
     val spinDao = db.spinDao()
     val settingDao = db.settingDao()
-    val clientDao = db.clientDao()
 
     val allCampaigns: Flow<List<CampaignEntity>> = campaignDao.getAllCampaigns()
     val allSpins: Flow<List<SpinEntity>> = spinDao.getAllSpins()
@@ -43,12 +42,4 @@ class Repository(private val db: AppDatabase) {
     fun getSettings(campaignId: Long): Flow<List<SettingEntity>> = settingDao.getSettings(campaignId)
     suspend fun getSetting(campaignId: Long, key: String): SettingEntity? = settingDao.getSetting(campaignId, key)
     suspend fun saveSetting(setting: SettingEntity) = settingDao.insertOrUpdateSetting(setting)
-
-    fun getClientsForCampaign(campaignId: Long): Flow<List<ClientEntity>> = clientDao.getClientsForCampaign(campaignId)
-    suspend fun insertClient(client: ClientEntity): Long = clientDao.insertClient(client)
-    suspend fun insertClients(clients: List<ClientEntity>) = clientDao.insertClients(clients)
-    suspend fun updateClient(client: ClientEntity) = clientDao.updateClient(client)
-    suspend fun deleteClient(client: ClientEntity) = clientDao.deleteClient(client)
-    suspend fun deleteClients(ids: List<Long>) = clientDao.deleteClients(ids)
-    suspend fun clearClientsForCampaign(campaignId: Long) = clientDao.clearClientsForCampaign(campaignId)
 }

@@ -15,10 +15,9 @@ import kotlinx.coroutines.launch
         PrizeEntity::class,
         AccessCodeEntity::class,
         SpinEntity::class,
-        SettingEntity::class,
-        ClientEntity::class
+        SettingEntity::class
     ],
-    version = 2,
+    version = 1,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -27,7 +26,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun accessCodeDao(): AccessCodeDao
     abstract fun spinDao(): SpinDao
     abstract fun settingDao(): SettingDao
-    abstract fun clientDao(): ClientDao
 
     companion object {
         @Volatile
@@ -40,7 +38,6 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "roleta_database"
                 )
-                    .fallbackToDestructiveMigration()
                     .addCallback(DatabaseCallback())
                     .build()
                 INSTANCE = instance

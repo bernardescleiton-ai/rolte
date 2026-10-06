@@ -60,17 +60,3 @@ data class SettingEntity(
     val key: String,
     val value: String
 )
-
-@Entity(tableName = "clients")
-data class ClientEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val campaignId: Long,
-    val nome: String,
-    val whatsapp: String,
-    val cleanPhone: String,
-    val vencimento: String,
-    val codigo: String,
-    val sent: Boolean = false,
-    val sentAt: Long? = null,
-    val createdAt: Long = System.currentTimeMillis()
-)

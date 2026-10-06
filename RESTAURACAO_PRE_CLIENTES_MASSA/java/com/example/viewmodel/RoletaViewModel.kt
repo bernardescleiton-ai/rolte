@@ -28,9 +28,6 @@ class RoletaViewModel(application: Application) : AndroidViewModel(application) 
     private val _accessCodes = MutableStateFlow<List<AccessCodeEntity>>(emptyList())
     val accessCodes: StateFlow<List<AccessCodeEntity>> = _accessCodes.asStateFlow()
 
-    private val _clients = MutableStateFlow<List<ClientEntity>>(emptyList())
-    val clients: StateFlow<List<ClientEntity>> = _clients.asStateFlow()
-
     private val _settings = MutableStateFlow<Map<String, String>>(emptyMap())
     val settings: StateFlow<Map<String, String>> = _settings.asStateFlow()
 
@@ -74,11 +71,6 @@ class RoletaViewModel(application: Application) : AndroidViewModel(application) 
                 launch {
                     repository.getCodesForCampaign(c.id).collect { codeList ->
                         _accessCodes.value = codeList
-                    }
-                }
-                launch {
-                    repository.getClientsForCampaign(c.id).collect { clientList ->
-                        _clients.value = clientList
                     }
                 }
                 launch {
@@ -412,166 +404,6 @@ class RoletaViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             repository.saveSetting(SettingEntity(campaignId = campaignId, key = key, value = value))
         }
-    }
-
-    // Bulk Clients & WhatsApp Management
-    fun addBulkClients(campaignId: Long, rawText: String, onFinished: (Int) -> Unit = {}) {
-        viewModelScope.launch {
-            if (rawText.isBlank()) return@launch
-            val parsedList = parseBulkClientsInput(rawText)
-            if (parsedList.isEmpty()) return@launch
-
-            val clientsToInsert = mutableListOf<ClientEntity>()
-            val codesToInsert = mutableListOf<AccessCodeEntity>()
-
-            for (item in parsedList) {
-                val rawPhone = item.whatsapp.trim()
-                val cleanDigits = rawPhone.filter { it.isDigit() }
-                var formattedPhone = rawPhone
-                if (cleanDigits.length == 11) {
-                    formattedPhone = "(${cleanDigits.substring(0, 2)}) ${cleanDigits.substring(2, 7)}-${cleanDigits.substring(7)}"
-                } else if (cleanDigits.length == 10) {
-                    formattedPhone = "(${cleanDigits.substring(0, 2)}) ${cleanDigits.substring(2, 6)}-${cleanDigits.substring(6)}"
-                }
-
-                val phoneForWa = if (!cleanDigits.startsWith("55") && (cleanDigits.length == 10 || cleanDigits.length == 11)) {
-                    "55$cleanDigits"
-                } else {
-                    cleanDigits
-                }
-
-                val codeToUse = if (!item.codigo.isNullOrBlank()) {
-                    item.codigo.trim().uppercase()
-                } else {
-                    val chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-                    val rand = (1..6).map { chars.random() }.joinToString("")
-                    "RLT-$rand"
-                }
-
-                codesToInsert.add(
-                    AccessCodeEntity(
-                        campaignId = campaignId,
-                        code = codeToUse,
-                        status = "AVAILABLE"
-                    )
-                )
-
-                clientsToInsert.add(
-                    ClientEntity(
-                        campaignId = campaignId,
-                        nome = item.nome.trim(),
-                        whatsapp = formattedPhone,
-                        cleanPhone = phoneForWa,
-                        vencimento = item.vencimento.trim(),
-                        codigo = codeToUse,
-                        sent = false,
-                        sentAt = null
-                    )
-                )
-            }
-
-            repository.insertCodes(codesToInsert)
-            repository.insertClients(clientsToInsert)
-            onFinished(clientsToInsert.size)
-        }
-    }
-
-    fun toggleClientSent(client: ClientEntity) {
-        viewModelScope.launch {
-            repository.updateClient(
-                client.copy(
-                    sent = !client.sent,
-                    sentAt = if (!client.sent) System.currentTimeMillis() else null
-                )
-            )
-        }
-    }
-
-    fun markClientSent(client: ClientEntity) {
-        viewModelScope.launch {
-            repository.updateClient(
-                client.copy(
-                    sent = true,
-                    sentAt = System.currentTimeMillis()
-                )
-            )
-        }
-    }
-
-    fun deleteClient(client: ClientEntity) {
-        viewModelScope.launch {
-            repository.deleteClient(client)
-        }
-    }
-
-    fun deleteClients(ids: List<Long>) {
-        viewModelScope.launch {
-            repository.deleteClients(ids)
-        }
-    }
-
-    fun clearClientsForCampaign(campaignId: Long) {
-        viewModelScope.launch {
-            repository.clearClientsForCampaign(campaignId)
-        }
-    }
-
-    private data class ParsedClientInput(
-        val nome: String,
-        val whatsapp: String,
-        val vencimento: String,
-        val codigo: String?
-    )
-
-    private fun parseBulkClientsInput(rawText: String): List<ParsedClientInput> {
-        val result = mutableListOf<ParsedClientInput>()
-        val blocks = rawText.split(Regex("\\n\\s*\\n+")).map { it.trim() }.filter { it.isNotBlank() }
-
-        for (block in blocks) {
-            val lines = block.lines().map { it.trim() }.filter { it.isNotBlank() }
-            if (lines.size == 3) {
-                result.add(ParsedClientInput(lines[0], lines[1], lines[2], null))
-            } else if (lines.size == 4) {
-                val l3 = lines[3]
-                if (l3.startsWith("RLT-", ignoreCase = true) || l3.matches(Regex("^[A-Z0-9-]{5,15}$", RegexOption.IGNORE_CASE))) {
-                    result.add(ParsedClientInput(lines[0], lines[1], lines[2], l3.uppercase()))
-                } else {
-                    result.add(ParsedClientInput(lines[0], lines[1], lines[2], l3))
-                }
-            } else if (lines.size > 4) {
-                var i = 0
-                while (i < lines.size) {
-                    val l0 = lines.getOrNull(i)
-                    val l1 = lines.getOrNull(i + 1)
-                    val l2 = lines.getOrNull(i + 2)
-                    val l3 = lines.getOrNull(i + 3)
-                    if (l0 != null && l1 != null && l2 != null) {
-                        if (l3 != null && (l3.startsWith("RLT-", ignoreCase = true) || l3.matches(Regex("^[A-Z0-9-]{5,15}$", RegexOption.IGNORE_CASE)))) {
-                            result.add(ParsedClientInput(l0, l1, l2, l3.uppercase()))
-                            i += 4
-                        } else {
-                            result.add(ParsedClientInput(l0, l1, l2, null))
-                            i += 3
-                        }
-                    } else {
-                        i++
-                    }
-                }
-            } else if (lines.size == 1 && (lines[0].contains(';') || lines[0].contains(',') || lines[0].contains('\t'))) {
-                val parts = lines[0].split(Regex("[;,\\t|]+")).map { it.trim() }.filter { it.isNotBlank() }
-                if (parts.size >= 3) {
-                    result.add(
-                        ParsedClientInput(
-                            nome = parts[0],
-                            whatsapp = parts[1],
-                            vencimento = parts[2],
-                            codigo = parts.getOrNull(3)?.uppercase()
-                        )
-                    )
-                }
-            }
-        }
-        return result
     }
 }
 

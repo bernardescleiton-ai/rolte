@@ -523,6 +523,33 @@ class RoletaViewModel(application: Application) : AndroidViewModel(application) 
         val codigo: String?
     )
 
+    private data class PhoneAndVenc(val whatsapp: String, val vencimento: String)
+
+    private fun extractPhoneAndVencimento(val1: String, val2: String): PhoneAndVenc {
+        val s1 = val1.trim()
+        val s2 = val2.trim()
+
+        val isDate1 = s1.contains(Regex("\\d{1,2}[/\\-\\.]\\d{1,2}[/\\-\\.]\\d{2,4}")) || s1.contains(Regex("^\\d{4}[/\\-\\.]\\d{1,2}"))
+        val isDate2 = s2.contains(Regex("\\d{1,2}[/\\-\\.]\\d{1,2}[/\\-\\.]\\d{2,4}")) || s2.contains(Regex("^\\d{4}[/\\-\\.]\\d{1,2}"))
+
+        val digits1 = s1.filter { it.isDigit() }
+        val digits2 = s2.filter { it.isDigit() }
+
+        if (isDate1 && !isDate2) {
+            return PhoneAndVenc(whatsapp = s2, vencimento = s1)
+        }
+        if (isDate2 && !isDate1) {
+            return PhoneAndVenc(whatsapp = s1, vencimento = s2)
+        }
+        if (digits1.length >= 10 && !s1.contains('/') && s2.contains('/')) {
+            return PhoneAndVenc(whatsapp = s1, vencimento = s2)
+        }
+        if (digits2.length >= 10 && !s2.contains('/') && s1.contains('/')) {
+            return PhoneAndVenc(whatsapp = s2, vencimento = s1)
+        }
+        return PhoneAndVenc(whatsapp = s1, vencimento = s2)
+    }
+
     private fun parseBulkClientsInput(rawText: String): List<ParsedClientInput> {
         val result = mutableListOf<ParsedClientInput>()
         val blocks = rawText.split(Regex("\\n\\s*\\n+")).map { it.trim() }.filter { it.isNotBlank() }
@@ -530,13 +557,15 @@ class RoletaViewModel(application: Application) : AndroidViewModel(application) 
         for (block in blocks) {
             val lines = block.lines().map { it.trim() }.filter { it.isNotBlank() }
             if (lines.size == 3) {
-                result.add(ParsedClientInput(lines[0], lines[1], lines[2], null))
+                val pair = extractPhoneAndVencimento(lines[1], lines[2])
+                result.add(ParsedClientInput(lines[0], pair.whatsapp, pair.vencimento, null))
             } else if (lines.size == 4) {
+                val pair = extractPhoneAndVencimento(lines[1], lines[2])
                 val l3 = lines[3]
                 if (l3.startsWith("RLT-", ignoreCase = true) || l3.matches(Regex("^[A-Z0-9-]{5,15}$", RegexOption.IGNORE_CASE))) {
-                    result.add(ParsedClientInput(lines[0], lines[1], lines[2], l3.uppercase()))
+                    result.add(ParsedClientInput(lines[0], pair.whatsapp, pair.vencimento, l3.uppercase()))
                 } else {
-                    result.add(ParsedClientInput(lines[0], lines[1], lines[2], l3))
+                    result.add(ParsedClientInput(lines[0], pair.whatsapp, pair.vencimento, l3))
                 }
             } else if (lines.size > 4) {
                 var i = 0
@@ -546,11 +575,12 @@ class RoletaViewModel(application: Application) : AndroidViewModel(application) 
                     val l2 = lines.getOrNull(i + 2)
                     val l3 = lines.getOrNull(i + 3)
                     if (l0 != null && l1 != null && l2 != null) {
+                        val pair = extractPhoneAndVencimento(l1, l2)
                         if (l3 != null && (l3.startsWith("RLT-", ignoreCase = true) || l3.matches(Regex("^[A-Z0-9-]{5,15}$", RegexOption.IGNORE_CASE)))) {
-                            result.add(ParsedClientInput(l0, l1, l2, l3.uppercase()))
+                            result.add(ParsedClientInput(l0, pair.whatsapp, pair.vencimento, l3.uppercase()))
                             i += 4
                         } else {
-                            result.add(ParsedClientInput(l0, l1, l2, null))
+                            result.add(ParsedClientInput(l0, pair.whatsapp, pair.vencimento, null))
                             i += 3
                         }
                     } else {
@@ -560,11 +590,12 @@ class RoletaViewModel(application: Application) : AndroidViewModel(application) 
             } else if (lines.size == 1 && (lines[0].contains(';') || lines[0].contains(',') || lines[0].contains('\t'))) {
                 val parts = lines[0].split(Regex("[;,\\t|]+")).map { it.trim() }.filter { it.isNotBlank() }
                 if (parts.size >= 3) {
+                    val pair = extractPhoneAndVencimento(parts[1], parts[2])
                     result.add(
                         ParsedClientInput(
                             nome = parts[0],
-                            whatsapp = parts[1],
-                            vencimento = parts[2],
+                            whatsapp = pair.whatsapp,
+                            vencimento = pair.vencimento,
                             codigo = parts.getOrNull(3)?.uppercase()
                         )
                     )

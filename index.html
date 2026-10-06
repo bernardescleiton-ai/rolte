@@ -151,6 +151,29 @@
                     return initial;
                 }
                 if (!parsed.clients) parsed.clients = [];
+                // Auto-correct any inverted phone / vencimento in saved records
+                parsed.clients.forEach(c => {
+                    if (c.whatsapp && c.vencimento) {
+                        const isDatePhone = /\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/.test(c.whatsapp);
+                        const isDateVenc = /\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/.test(c.vencimento);
+                        if (isDatePhone && !isDateVenc) {
+                            const tmp = c.whatsapp;
+                            c.whatsapp = c.vencimento;
+                            c.vencimento = tmp;
+                            const digits = c.whatsapp.replace(/\D/g, '');
+                            if (digits.length === 11) {
+                                c.whatsapp = `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+                            } else if (digits.length === 10) {
+                                c.whatsapp = `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+                            }
+                            let phoneForWa = digits;
+                            if (!phoneForWa.startsWith('55') && (phoneForWa.length === 10 || phoneForWa.length === 11)) {
+                                phoneForWa = '55' + phoneForWa;
+                            }
+                            c.cleanPhone = phoneForWa;
+                        }
+                    }
+                });
                 return parsed;
             } catch (e) {
                 const initial = getInitialData();
@@ -1362,6 +1385,31 @@
             showToast("Texto promocional salvo com sucesso no Supabase!", "success");
         }
 
+        function extractClientPhoneAndVencimento(val1, val2) {
+            const s1 = String(val1 || '').trim();
+            const s2 = String(val2 || '').trim();
+
+            const isDate1 = /\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/.test(s1) || /^\d{4}[\/\-\.]\d{1,2}/.test(s1);
+            const isDate2 = /\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/.test(s2) || /^\d{4}[\/\-\.]\d{1,2}/.test(s2);
+
+            const digits1 = s1.replace(/\D/g, '');
+            const digits2 = s2.replace(/\D/g, '');
+
+            if (isDate1 && !isDate2) {
+                return { whatsapp: s2, vencimento: s1 };
+            }
+            if (isDate2 && !isDate1) {
+                return { whatsapp: s1, vencimento: s2 };
+            }
+            if (digits1.length >= 10 && !s1.includes('/') && s2.includes('/')) {
+                return { whatsapp: s1, vencimento: s2 };
+            }
+            if (digits2.length >= 10 && !s2.includes('/') && s1.includes('/')) {
+                return { whatsapp: s2, vencimento: s1 };
+            }
+            return { whatsapp: s1, vencimento: s2 };
+        }
+
         function parseBulkClientsText(rawText) {
             if (!rawText || !rawText.trim()) return [];
             const text = rawText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -1373,13 +1421,15 @@
             for (const block of blocks) {
                 const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
                 if (lines.length === 3) {
-                    parsed.push({ nome: lines[0], whatsapp: lines[1], vencimento: lines[2], codigo: null });
+                    const pair = extractClientPhoneAndVencimento(lines[1], lines[2]);
+                    parsed.push({ nome: lines[0], whatsapp: pair.whatsapp, vencimento: pair.vencimento, codigo: null });
                 } else if (lines.length === 4) {
+                    const pair = extractClientPhoneAndVencimento(lines[1], lines[2]);
                     const l3 = lines[3];
                     if (l3.toUpperCase().startsWith("RLT-") || /^[A-Z0-9-]{5,15}$/i.test(l3)) {
-                        parsed.push({ nome: lines[0], whatsapp: lines[1], vencimento: lines[2], codigo: l3.toUpperCase() });
+                        parsed.push({ nome: lines[0], whatsapp: pair.whatsapp, vencimento: pair.vencimento, codigo: l3.toUpperCase() });
                     } else {
-                        parsed.push({ nome: lines[0], whatsapp: lines[1], vencimento: lines[2], codigo: l3 });
+                        parsed.push({ nome: lines[0], whatsapp: pair.whatsapp, vencimento: pair.vencimento, codigo: l3 });
                     }
                 } else if (lines.length > 4) {
                     // Multiple clients inside this block without empty lines
@@ -1390,11 +1440,12 @@
                         const l2 = lines[i + 2] || "";
                         const l3 = lines[i + 3] || "";
                         if (l0 && l1 && l2) {
+                            const pair = extractClientPhoneAndVencimento(l1, l2);
                             if (l3 && (l3.toUpperCase().startsWith("RLT-") || /^[A-Z0-9-]{5,15}$/i.test(l3))) {
-                                parsed.push({ nome: l0, whatsapp: l1, vencimento: l2, codigo: l3.toUpperCase() });
+                                parsed.push({ nome: l0, whatsapp: pair.whatsapp, vencimento: pair.vencimento, codigo: l3.toUpperCase() });
                                 i += 4;
                             } else {
-                                parsed.push({ nome: l0, whatsapp: l1, vencimento: l2, codigo: null });
+                                parsed.push({ nome: l0, whatsapp: pair.whatsapp, vencimento: pair.vencimento, codigo: null });
                                 i += 3;
                             }
                         } else {
@@ -1404,10 +1455,11 @@
                 } else if (lines.length === 1 && (lines[0].includes(';') || lines[0].includes(',') || lines[0].includes('\t'))) {
                     const parts = lines[0].split(/[;,\t|]+/).map(p => p.trim()).filter(Boolean);
                     if (parts.length >= 3) {
+                        const pair = extractClientPhoneAndVencimento(parts[1], parts[2]);
                         parsed.push({
                             nome: parts[0],
-                            whatsapp: parts[1],
-                            vencimento: parts[2],
+                            whatsapp: pair.whatsapp,
+                            vencimento: pair.vencimento,
                             codigo: parts[3] ? parts[3].toUpperCase() : null
                         });
                     }

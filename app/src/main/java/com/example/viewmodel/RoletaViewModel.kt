@@ -316,6 +316,18 @@ class RoletaViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun deleteCodes(ids: List<Long>) {
+        viewModelScope.launch {
+            repository.deleteCodes(ids)
+        }
+    }
+
+    fun deleteUsedCodes(campaignId: Long) {
+        viewModelScope.launch {
+            repository.deleteUsedCodes(campaignId)
+        }
+    }
+
     fun updateSpinClientInfo(spinId: Long, campaignId: Long, accessCodeId: Long, prizeId: Long, clientName: String?, observation: String?, prizeName: String, discount: String, createdAt: Long) {
         viewModelScope.launch {
             val spin = SpinEntity(
@@ -330,6 +342,24 @@ class RoletaViewModel(application: Application) : AndroidViewModel(application) 
                 createdAt = createdAt
             )
             repository.updateSpin(spin)
+        }
+    }
+
+    fun deleteSpin(id: Long) {
+        viewModelScope.launch {
+            repository.deleteSpin(id)
+        }
+    }
+
+    fun deleteSpins(ids: List<Long>) {
+        viewModelScope.launch {
+            repository.deleteSpins(ids)
+        }
+    }
+
+    fun clearAllSpins() {
+        viewModelScope.launch {
+            repository.clearAllSpins()
         }
     }
 

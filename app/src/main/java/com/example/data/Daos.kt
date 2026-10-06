@@ -68,6 +68,12 @@ interface AccessCodeDao {
 
     @Query("DELETE FROM access_codes WHERE id = :id")
     suspend fun deleteCode(id: Long)
+
+    @Query("DELETE FROM access_codes WHERE id IN (:ids)")
+    suspend fun deleteCodes(ids: List<Long>)
+
+    @Query("DELETE FROM access_codes WHERE campaignId = :campaignId AND status = 'USED'")
+    suspend fun deleteUsedCodes(campaignId: Long)
 }
 
 @Dao
@@ -86,6 +92,12 @@ interface SpinDao {
 
     @Query("DELETE FROM spins WHERE id = :id")
     suspend fun deleteSpin(id: Long)
+
+    @Query("DELETE FROM spins WHERE id IN (:ids)")
+    suspend fun deleteSpins(ids: List<Long>)
+
+    @Query("DELETE FROM spins")
+    suspend fun clearAllSpins()
 }
 
 @Dao

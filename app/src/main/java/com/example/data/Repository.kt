@@ -29,11 +29,15 @@ class Repository(private val db: AppDatabase) {
     suspend fun insertCodes(codes: List<AccessCodeEntity>) = accessCodeDao.insertCodes(codes)
     suspend fun updateCode(code: AccessCodeEntity) = accessCodeDao.updateCode(code)
     suspend fun deleteCode(id: Long) = accessCodeDao.deleteCode(id)
+    suspend fun deleteCodes(ids: List<Long>) = accessCodeDao.deleteCodes(ids)
+    suspend fun deleteUsedCodes(campaignId: Long) = accessCodeDao.deleteUsedCodes(campaignId)
 
     fun getSpinsForCampaign(campaignId: Long): Flow<List<SpinEntity>> = spinDao.getSpinsForCampaign(campaignId)
     suspend fun insertSpin(spin: SpinEntity): Long = spinDao.insertSpin(spin)
     suspend fun updateSpin(spin: SpinEntity) = spinDao.updateSpin(spin)
     suspend fun deleteSpin(id: Long) = spinDao.deleteSpin(id)
+    suspend fun deleteSpins(ids: List<Long>) = spinDao.deleteSpins(ids)
+    suspend fun clearAllSpins() = spinDao.clearAllSpins()
 
     fun getSettings(campaignId: Long): Flow<List<SettingEntity>> = settingDao.getSettings(campaignId)
     suspend fun getSetting(campaignId: Long, key: String): SettingEntity? = settingDao.getSetting(campaignId, key)

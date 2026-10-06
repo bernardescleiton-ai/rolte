@@ -99,7 +99,9 @@ fun AdminScreen(
                     onGenerate = { count -> currentCampaign?.let { viewModel.generateCodes(it.id, count) } },
                     onAddManual = { code -> currentCampaign?.let { viewModel.addManualCode(it.id, code) } },
                     onUpdateStatus = { code, status -> viewModel.updateCodeStatus(code, status) },
-                    onDelete = { viewModel.deleteCode(it) }
+                    onDelete = { viewModel.deleteCode(it) },
+                    onDeleteCodes = { viewModel.deleteCodes(it) },
+                    onDeleteUsedCodes = { currentCampaign?.let { viewModel.deleteUsedCodes(it.id) } }
                 )
                 3 -> ResultsTab(
                     spins = allSpins,
@@ -116,7 +118,10 @@ fun AdminScreen(
                             discount = spin.discountSnapshot,
                             createdAt = spin.createdAt
                         )
-                    }
+                    },
+                    onDeleteSpin = { viewModel.deleteSpin(it) },
+                    onDeleteSpins = { viewModel.deleteSpins(it) },
+                    onClearAllSpins = { viewModel.clearAllSpins() }
                 )
                 4 -> SettingsTab(
                     currentCampaign = currentCampaign,
@@ -341,7 +346,9 @@ fun CodesTab(
     onGenerate: (Int) -> Unit,
     onAddManual: (String) -> Unit,
     onUpdateStatus: (AccessCodeEntity, String) -> Unit,
-    onDelete: (Long) -> Unit
+    onDelete: (Long) -> Unit,
+    onDeleteCodes: (List<Long>) -> Unit = {},
+    onDeleteUsedCodes: () -> Unit = {}
 ) {
     if (currentCampaign == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -352,6 +359,8 @@ fun CodesTab(
 
     var manualCodeInput by remember { mutableStateOf("") }
     var generateCountInput by remember { mutableStateOf("50") }
+    val selectedCodeIds = remember { mutableStateListOf<Long>() }
+    val usedCodes = remember(codes) { codes.filter { it.status == "USED" } }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("Gerenciamento de Códigos (${currentCampaign.name})", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -392,24 +401,96 @@ fun CodesTab(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+
+        // Actions for used codes
+        if (usedCodes.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Usados: ${usedCodes.size} | Selecionados: ${selectedCodeIds.size}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedButton(onClick = {
+                        if (selectedCodeIds.size == usedCodes.size) {
+                            selectedCodeIds.clear()
+                        } else {
+                            selectedCodeIds.clear()
+                            selectedCodeIds.addAll(usedCodes.map { it.id })
+                        }
+                    }) {
+                        Text(if (selectedCodeIds.size == usedCodes.size) "Desmarcar" else "Selecionar Usados")
+                    }
+
+                    if (selectedCodeIds.isNotEmpty()) {
+                        Button(
+                            onClick = {
+                                onDeleteCodes(selectedCodeIds.toList())
+                                selectedCodeIds.clear()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Excluir (${selectedCodeIds.size})")
+                        }
+                    } else {
+                        Button(
+                            onClick = {
+                                onDeleteUsedCodes()
+                                selectedCodeIds.clear()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer, contentColor = MaterialTheme.colorScheme.onErrorContainer)
+                        ) {
+                            Text("Excluir Todos Usados")
+                        }
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
         Text("Lista de Códigos (${codes.size})", fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(8.dp))
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxSize()) {
             items(codes) { code ->
-                Card(modifier = Modifier.fillMaxWidth()) {
+                val isUsed = code.status == "USED"
+                val isSelected = selectedCodeIds.contains(code.id)
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isSelected) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(12.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
-                            Text(code.code, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                            Text("Status: ${code.status}", color = when(code.status) {
-                                "AVAILABLE" -> Color(0xFF10B981)
-                                "USED" -> Color(0xFF3B82F6)
-                                else -> Color.Gray
-                            })
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (isUsed) {
+                                Checkbox(
+                                    checked = isSelected,
+                                    onCheckedChange = { checked ->
+                                        if (checked) selectedCodeIds.add(code.id) else selectedCodeIds.remove(code.id)
+                                    }
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                            }
+                            Column {
+                                Text(code.code, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                Text("Status: ${code.status}", color = when(code.status) {
+                                    "AVAILABLE" -> Color(0xFF10B981)
+                                    "USED" -> Color(0xFFEAB308)
+                                    else -> Color.Gray
+                                })
+                            }
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             if (code.status == "AVAILABLE") {
@@ -417,7 +498,10 @@ fun CodesTab(
                             } else if (code.status == "INACTIVE") {
                                 OutlinedButton(onClick = { onUpdateStatus(code, "AVAILABLE") }) { Text("Ativar") }
                             }
-                            IconButton(onClick = { onDelete(code.id) }) {
+                            IconButton(onClick = {
+                                selectedCodeIds.remove(code.id)
+                                onDelete(code.id)
+                            }) {
                                 Icon(Icons.Default.Delete, contentDescription = "Excluir", tint = Color.Red)
                             }
                         }
@@ -432,23 +516,109 @@ fun CodesTab(
 fun ResultsTab(
     spins: List<SpinEntity>,
     currentCampaign: CampaignEntity?,
-    onUpdateSpin: (SpinEntity, String?, String?) -> Unit
+    onUpdateSpin: (SpinEntity, String?, String?) -> Unit,
+    onDeleteSpin: (Long) -> Unit,
+    onDeleteSpins: (List<Long>) -> Unit,
+    onClearAllSpins: () -> Unit
 ) {
+    val selectedIds = remember { mutableStateListOf<Long>() }
+
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        Text("Resultados dos Giros", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text("Resultados dos Giros", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("${spins.size} registrado(s)", fontSize = 12.sp, color = Color.Gray)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (selectedIds.isNotEmpty()) {
+                    Button(
+                        onClick = {
+                            onDeleteSpins(selectedIds.toList())
+                            selectedIds.clear()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = "Excluir Selecionados", modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Excluir (${selectedIds.size})")
+                    }
+                } else if (spins.isNotEmpty()) {
+                    OutlinedButton(
+                        onClick = { onClearAllSpins() },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Excluir Todos")
+                    }
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(12.dp))
+
+        if (spins.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val allSelected = selectedIds.size == spins.size
+                Checkbox(
+                    checked = allSelected,
+                    onCheckedChange = { checked ->
+                        selectedIds.clear()
+                        if (checked) {
+                            selectedIds.addAll(spins.map { it.id })
+                        }
+                    }
+                )
+                Text(
+                    if (allSelected) "Desmarcar Todos" else "Selecionar Todos (${spins.size})",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
 
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(spins) { spin ->
                 var clientName by remember { mutableStateOf(spin.clientName ?: "") }
                 var observation by remember { mutableStateOf(spin.observation ?: "") }
                 var isEditing by remember { mutableStateOf(false) }
+                val isSelected = selectedIds.contains(spin.id)
 
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Prêmio: ${spin.prizeNameSnapshot}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                            Text("Desconto: ${spin.discountSnapshot}", fontWeight = FontWeight.Bold)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(
+                                    checked = isSelected,
+                                    onCheckedChange = { checked ->
+                                        if (checked) selectedIds.add(spin.id) else selectedIds.remove(spin.id)
+                                    }
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Column {
+                                    Text("Prêmio: ${spin.prizeNameSnapshot}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                    Text("Desconto: ${spin.discountSnapshot}", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            IconButton(onClick = { onDeleteSpin(spin.id) }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Excluir", tint = MaterialTheme.colorScheme.error)
+                            }
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         if (isEditing) {
@@ -490,11 +660,11 @@ fun SettingsTab(
         return
     }
 
-    var title by remember(settings) { mutableStateOf(settings["title"] ?: "") }
-    var subtitle by remember(settings) { mutableStateOf(settings["subtitle"] ?: "") }
-    var btnText by remember(settings) { mutableStateOf(settings["spin_button"] ?: "") }
-    var bgColor by remember(settings) { mutableStateOf(settings["bg_color"] ?: "") }
-    var btnColor by remember(settings) { mutableStateOf(settings["btn_color"] ?: "") }
+    var title by remember(currentCampaign.id) { mutableStateOf(settings["title"] ?: "") }
+    var subtitle by remember(currentCampaign.id) { mutableStateOf(settings["subtitle"] ?: "") }
+    var btnText by remember(currentCampaign.id) { mutableStateOf(settings["spin_button"] ?: "") }
+    var bgColor by remember(currentCampaign.id) { mutableStateOf(settings["bg_color"] ?: "") }
+    var btnColor by remember(currentCampaign.id) { mutableStateOf(settings["btn_color"] ?: "") }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("Configurações da Página (${currentCampaign.name})", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)

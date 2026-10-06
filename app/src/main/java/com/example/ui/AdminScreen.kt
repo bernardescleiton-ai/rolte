@@ -705,6 +705,7 @@ fun SettingsTab(
     var subtitle by remember(currentCampaign.id) { mutableStateOf(settings["subtitle"] ?: "") }
     var btnText by remember(currentCampaign.id) { mutableStateOf(settings["spin_button"] ?: "") }
     var bgColor by remember(currentCampaign.id) { mutableStateOf(settings["bg_color"] ?: "") }
+    var bgImage by remember(currentCampaign.id) { mutableStateOf(settings["bg_image"] ?: "") }
     var btnColor by remember(currentCampaign.id) { mutableStateOf(settings["btn_color"] ?: "") }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -721,6 +722,8 @@ fun SettingsTab(
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(value = bgColor, onValueChange = { bgColor = it }, label = { Text("Cor de Fundo (HEX ex: #0F172A)") }, modifier = Modifier.fillMaxWidth())
                 Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(value = bgImage, onValueChange = { bgImage = it }, label = { Text("URL da Imagem de Fundo (Opcional)") }, modifier = Modifier.fillMaxWidth())
+                Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(value = btnColor, onValueChange = { btnColor = it }, label = { Text("Cor do Botão (HEX ex: #10B981)") }, modifier = Modifier.fillMaxWidth())
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(onClick = {
@@ -728,6 +731,7 @@ fun SettingsTab(
                     onSave("subtitle", subtitle)
                     onSave("spin_button", btnText)
                     onSave("bg_color", bgColor)
+                    onSave("bg_image", bgImage)
                     onSave("btn_color", btnColor)
                 }) {
                     Text("Salvar Configurações")

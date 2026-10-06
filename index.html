@@ -190,6 +190,7 @@
                 spin_button: settingsDraft.spin_button !== undefined ? settingsDraft.spin_button : (saved.spin_button !== undefined ? saved.spin_button : "CLIQUE AQUI E GIRE A ROLETA"),
                 liberate_button: settingsDraft.liberate_button !== undefined ? settingsDraft.liberate_button : (saved.liberate_button !== undefined ? saved.liberate_button : "LIBERAR ROLETA"),
                 bg_color: settingsDraft.bg_color !== undefined ? settingsDraft.bg_color : (saved.bg_color || "#060913"),
+                bg_image: settingsDraft.bg_image !== undefined ? settingsDraft.bg_image : (saved.bg_image || ""),
                 btn_color: settingsDraft.btn_color !== undefined ? settingsDraft.btn_color : (saved.btn_color || "#FACC15"),
                 text_color: saved.text_color || "#FFFFFF",
                 btn_text_color: saved.btn_text_color || "#1E1B4B",
@@ -462,8 +463,12 @@
             let prizes = (db.prizes || []).filter(p => String(p.campaignId) === String(campaign.id) && p.active !== false && (p.unlimitedQuantity || p.quantity === undefined || p.quantity > 0));
 
             container.innerHTML = `
-                <div class="flex-1 flex flex-col items-center justify-center p-4 relative transition-colors duration-300" style="background-color: ${settings.bg_color || '#060913'}; color: ${settings.text_color || '#FFFFFF'};">
-                    <div class="max-w-md w-full text-center px-4 py-6 flex flex-col items-center">
+                <div class="flex-1 flex flex-col items-center justify-center p-4 relative transition-colors duration-300 min-h-screen overflow-hidden" style="background-color: ${settings.bg_color || '#060913'}; color: ${settings.text_color || '#FFFFFF'};">
+                    ${settings.bg_image ? `
+                        <div class="absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none transition-all duration-500" style="background-image: url('${settings.bg_image}');"></div>
+                        <div class="absolute inset-0 bg-slate-950/70 backdrop-blur-[1px] pointer-events-none"></div>
+                    ` : ''}
+                    <div class="max-w-md w-full text-center px-4 py-6 flex flex-col items-center relative z-10">
                         
                         <!-- Header Title configured by user in admin panel -->
                         <div class="mb-4 text-center">
@@ -1218,6 +1223,38 @@
                                                 oninput="handleSettingsChange('btn_color', this.value, ${activeCamp.id})" 
                                                 class="w-full bg-slate-900 border border-slate-700 px-3 py-2.5 rounded-xl font-mono text-sm text-white" 
                                                 style="font-size: 16px !important;">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="space-y-2 pt-1 border-t border-slate-700/60">
+                                    <div class="flex justify-between items-center">
+                                        <label class="block text-xs uppercase font-bold text-slate-400">Imagem de Fundo da Roleta (Opcional)</label>
+                                        ${s.bg_image ? `
+                                            <button type="button" onclick="handleRemoveBgImage(${activeCamp.id})" class="text-red-400 hover:text-red-300 text-xs font-bold transition flex items-center gap-1">
+                                                <i class="fa-solid fa-trash-can text-[10px]"></i> Remover Imagem
+                                            </button>
+                                        ` : ''}
+                                    </div>
+                                    <div class="space-y-2.5">
+                                        <input type="text" id="st_bg_image" value="${escapeHtml(s.bg_image || '')}" 
+                                            oninput="handleSettingsChange('bg_image', this.value, ${activeCamp.id}); updateBgImagePreview(this.value);" 
+                                            placeholder="Cole o link da imagem (ex: https://.../fundo.jpg)" 
+                                            class="w-full bg-slate-900 border border-slate-700 focus:border-yellow-400 px-4 py-2.5 rounded-xl font-mono text-xs text-white transition" 
+                                            style="font-size: 14px !important;">
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <label class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-3.5 py-2 rounded-xl cursor-pointer flex items-center gap-2 transition shadow">
+                                                <i class="fa-solid fa-cloud-arrow-up text-yellow-400"></i> Escolher Foto do Computador / Celular
+                                                <input type="file" accept="image/*" onchange="handleBgFileUpload(this, ${activeCamp.id})" class="hidden">
+                                            </label>
+                                            <span class="text-[11px] text-slate-400">PNG, JPG, JPEG ou WebP</span>
+                                        </div>
+                                        <div id="bgImagePreviewContainer" class="${s.bg_image ? '' : 'hidden'}">
+                                            <div class="relative h-28 rounded-xl overflow-hidden border border-slate-700 bg-slate-950 mt-1">
+                                                <img id="bgImagePreviewImg" src="${escapeHtml(s.bg_image || '')}" alt="Prévia do Fundo" class="w-full h-full object-cover">
+                                                <div class="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                                    <span class="text-xs text-white font-bold bg-slate-900/80 px-3 py-1 rounded-full border border-slate-700">Prévia do Fundo</span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -2307,6 +2344,51 @@
             document.getElementById("modalContainer").innerHTML = "";
         }
 
+        function updateBgImagePreview(url) {
+            const container = document.getElementById("bgImagePreviewContainer");
+            const img = document.getElementById("bgImagePreviewImg");
+            if (!container || !img) return;
+            if (url && url.trim()) {
+                img.src = url.trim();
+                container.classList.remove("hidden");
+            } else {
+                container.classList.add("hidden");
+            }
+        }
+
+        function handleBgFileUpload(input, campId) {
+            if (!input.files || !input.files[0]) return;
+            const file = input.files[0];
+            if (file.size > 4 * 1024 * 1024) {
+                alert("A imagem selecionada é muito grande. Escolha uma imagem de até 4MB.");
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const dataUrl = e.target.result;
+                const urlInput = document.getElementById("st_bg_image");
+                if (urlInput) urlInput.value = dataUrl;
+                handleSettingsChange('bg_image', dataUrl, campId);
+                updateBgImagePreview(dataUrl);
+                showToast("Imagem de fundo carregada! Clique em Salvar Configurações.", "info");
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function handleRemoveBgImage(campId) {
+            const urlInput = document.getElementById("st_bg_image");
+            if (urlInput) urlInput.value = "";
+            handleSettingsChange('bg_image', '', campId);
+            updateBgImagePreview('');
+            const db = loadDB();
+            if (db.settings && db.settings[campId]) {
+                db.settings[campId].bg_image = "";
+                saveDB(db, false);
+            }
+            showToast("Imagem de fundo removida. Usando cor sólida.", "info");
+            router();
+        }
+
         function savePrizeFromModal(prizeId, campaignId) {
             const name = document.getElementById("m_prize_name").value.trim();
             if (!name) {
@@ -2685,6 +2767,7 @@
             const spinBtnVal = document.getElementById("st_spin_btn") ? document.getElementById("st_spin_btn").value : (settingsDraft.spin_button || "CLIQUE AQUI E GIRE A ROLETA");
             const libBtnVal = document.getElementById("st_lib_btn") ? document.getElementById("st_lib_btn").value : (settingsDraft.liberate_button || "LIBERAR ROLETA");
             const bgVal = document.getElementById("st_bg") ? document.getElementById("st_bg").value : (settingsDraft.bg_color || "#060913");
+            const bgImageVal = document.getElementById("st_bg_image") ? document.getElementById("st_bg_image").value : (settingsDraft.bg_image || "");
             const btnVal = document.getElementById("st_btn") ? document.getElementById("st_btn").value : (settingsDraft.btn_color || "#FACC15");
 
             const updatedSettings = {
@@ -2693,6 +2776,7 @@
                 spin_button: spinBtnVal,
                 liberate_button: libBtnVal,
                 bg_color: bgVal,
+                bg_image: bgImageVal,
                 btn_color: btnVal,
                 text_color: "#FFFFFF",
                 btn_text_color: "#1E1B4B",

@@ -1,23 +1,42 @@
 ====================================================================
-PONTO DE RESTAURAÇÃO DO SISTEMA - SALVO NO STUDIO
+PONTO DE RESTAURAÇÃO DO SISTEMA - ATUALIZADO NO STUDIO
 ====================================================================
-Data / Registro: 08/10/2026
-Estado do Sistema: COMPLETO E FUNCIONAL
+Data / Horário do Ponto: 08/10/2026
+Estado do Sistema: COMPLETO, ESTÁVEL E FUNCIONAL
 
-DESCRIÇÃO DO ESTADO:
-- Sistema com importação e gestão de clientes em massa na aba Administrativa.
-- Separação e parsing automático de Nome, WhatsApp e Data de Vencimento (com tratamento inteligente que impede qualquer inversão entre telefone e data).
-- Geração automática de códigos válidos ("RLT-XXXXXX") para cada cliente inserido.
-- Disparo rápido e direto para WhatsApp com mensagem promocional configurável e tags dinâmicas ({nome}, {codigo}, {link}, {vencimento}).
-- Interface Web (index.html) e Aplicativo Android nativo (Jetpack Compose / Room) 100% integrados e compilando perfeitamente.
-- Roleta funcional com suporte a personalização de imagens de fundo.
+FUNCIONALIDADES E ESTADO REGISTRADOS NESTE PONTO:
+1. Identificação Completa do Cliente nos Resultados dos Giros:
+   - Na aba "Resultados dos giros", o sistema reconhece automaticamente
+     qual cliente realizou o giro através do código de liberação utilizado
+     ou nome cadastrado na aba "Clientes & WhatsApp".
+   - Exibe o nome do cliente, WhatsApp, data de vencimento, código usado,
+     prêmio conquistado com percentual/detalhes e data/hora do giro.
+   - Botão direto "Notificar no WhatsApp" para parabenizar o cliente e combinar o prêmio.
+   - Botão para copiar texto pronto de notificação.
 
-ARQUIVOS SALVOS NESTE PONTO DE RESTAURAÇÃO:
-1. index.html (Versão completa da aplicação web)
-2. app/ (Código-fonte completo do Android, incluindo Kotlin, UI, ViewModel, DAOs, Entidades Room, recursos visuais e drawables)
-3. build.gradle.kts, settings.gradle.kts, gradle.properties e metadata.json
+2. Adição de Clientes em Massa Corrigida:
+   - Correção e validação inteligente de formatos de clientes em massa,
+     evitando qualquer inversão entre WhatsApp e data de vencimento
+     (suporta tanto telefone seguido de vencimento quanto vencimento seguido de telefone).
+
+3. Roleta da Sorte & Painel Administrativo:
+   - Gestão de campanhas, prêmios e probabilidades.
+   - Gerador de códigos únicos e links de roleta com código pré-carregado.
+   - Envio de links com código para clientes via WhatsApp.
+   - Filtro e pesquisa por cliente, código ou campanha.
+   - Exportação em CSV de resultados com dados completos dos clientes.
+
+ARQUIVOS INCLUÍDOS NO BACKUP:
+- index.html (versão web completa com todas as funções)
+- app/src/ (código-fonte Android nativo em Kotlin/Jetpack Compose)
+- app/build.gradle.kts
+- app/proguard-rules.pro
+- build.gradle.kts
+- settings.gradle.kts
+- gradle.properties
+- metadata.json
 
 COMO RESTAURAR:
-Basta solicitar no chat: "Restaurar o sistema para o ponto de restauração atual"
-e todos os arquivos serão revertidos exatamente para esta versão salva.
+Basta solicitar no chat:
+"Restaure o sistema para o ponto de restauração salvo"
 ====================================================================

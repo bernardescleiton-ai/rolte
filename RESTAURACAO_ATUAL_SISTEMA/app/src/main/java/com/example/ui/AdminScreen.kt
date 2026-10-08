@@ -1,5 +1,6 @@
 package com.example.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,7 +21,9 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.example.data.*
 import com.example.viewmodel.RoletaViewModel
 
@@ -30,6 +33,122 @@ fun AdminScreen(
     viewModel: RoletaViewModel,
     onNavigatePublic: (String) -> Unit
 ) {
+    var isAuthenticated by remember { mutableStateOf(false) }
+    var emailInput by remember { mutableStateOf("") }
+    var passwordInput by remember { mutableStateOf("") }
+    var loginError by remember { mutableStateOf<String?>(null) }
+
+    if (!isAuthenticated) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 400.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = "Acesso Administrativo",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Text(
+                        text = "Acesso ao Painel",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Informe suas credenciais do Supabase para acessar a administração da roleta.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    if (loginError != null) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = loginError ?: "",
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = emailInput,
+                        onValueChange = { 
+                            emailInput = it
+                            loginError = null 
+                        },
+                        label = { Text("E-mail de Acesso") },
+                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("admin_email_input"),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = passwordInput,
+                        onValueChange = { 
+                            passwordInput = it
+                            loginError = null 
+                        },
+                        label = { Text("Senha") },
+                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("admin_password_input"),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    Button(
+                        onClick = {
+                            val email = emailInput.trim()
+                            val pass = passwordInput
+                            if (email.isBlank() || pass.isBlank()) {
+                                loginError = "Preencha o e-mail e a senha."
+                            } else {
+                                loginError = null
+                                isAuthenticated = true
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("admin_login_button"),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Entrar", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    }
+                }
+            }
+        }
+        return
+    }
+
     var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("Campanhas", "Prêmios", "Códigos", "Resultados", "Clientes", "Configurações")
 
@@ -58,6 +177,12 @@ fun AdminScreen(
                         IconButton(onClick = { onNavigatePublic(camp.slug) }) {
                             Icon(Icons.Default.Visibility, contentDescription = "Ver Roleta Pública")
                         }
+                    }
+                    IconButton(onClick = {
+                        isAuthenticated = false
+                        passwordInput = ""
+                    }) {
+                        Icon(Icons.Default.ExitToApp, contentDescription = "Sair")
                     }
                 }
             )
@@ -115,6 +240,8 @@ fun AdminScreen(
                 3 -> ResultsTab(
                     spins = allSpins,
                     currentCampaign = currentCampaign,
+                    clients = clients,
+                    accessCodes = accessCodes,
                     onUpdateSpin = { spin, clientName, obs ->
                         viewModel.updateSpinClientInfo(
                             spinId = spin.id,
@@ -135,6 +262,8 @@ fun AdminScreen(
                 4 -> ClientsTab(
                     currentCampaign = currentCampaign,
                     clients = clients,
+                    spins = allSpins,
+                    accessCodes = accessCodes,
                     promoTemplate = settings["promo_message"] ?: "Olá {nome}! Seu plano vence em {vencimento}.\nVocê ganhou um giro exclusivo na nossa Roleta da Sorte!\nAcesse o link abaixo e use o seu código para liberar a roleta:\n{link}\nSeu código: {codigo}\nBoa sorte! 🎉",
                     onSavePromoTemplate = { tmpl ->
                         currentCampaign?.let { viewModel.saveSetting(it.id, "promo_message", tmpl) }
@@ -550,11 +679,15 @@ fun CodesTab(
 fun ResultsTab(
     spins: List<SpinEntity>,
     currentCampaign: CampaignEntity?,
+    clients: List<ClientEntity> = emptyList(),
+    accessCodes: List<AccessCodeEntity> = emptyList(),
     onUpdateSpin: (SpinEntity, String?, String?) -> Unit,
     onDeleteSpin: (Long) -> Unit,
     onDeleteSpins: (List<Long>) -> Unit,
     onClearAllSpins: () -> Unit
 ) {
+    val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
     val selectedIds = remember { mutableStateListOf<Long>() }
     val filteredSpins = remember(spins, currentCampaign) {
         if (currentCampaign != null) spins.filter { it.campaignId == currentCampaign.id } else spins
@@ -625,20 +758,36 @@ fun ResultsTab(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             items(filteredSpins) { spin ->
-                var clientName by remember { mutableStateOf(spin.clientName ?: "") }
-                var observation by remember { mutableStateOf(spin.observation ?: "") }
+                val linkedCode = accessCodes.find { it.id == spin.accessCodeId }
+                val codeStr = linkedCode?.code ?: "Código #${spin.accessCodeId}"
+                val linkedClient = clients.find { cl ->
+                    (linkedCode != null && cl.codigo.equals(linkedCode.code, ignoreCase = true)) ||
+                    (!spin.clientName.isNullOrBlank() && cl.nome.equals(spin.clientName, ignoreCase = true))
+                }
+                val clientDisplayName = linkedClient?.nome ?: spin.clientName ?: ""
+                val clientPhone = linkedClient?.whatsapp ?: ""
+                val clientVencimento = linkedClient?.vencimento ?: ""
+                val cleanPhone = linkedClient?.cleanPhone ?: clientPhone.filter { it.isDigit() }
+                val prizeFull = "${spin.prizeNameSnapshot} (${spin.discountSnapshot})"
+                val notifyMsg = "Olá ${if (clientDisplayName.isNotBlank()) clientDisplayName else "Cliente"}! Parabéns, vimos que você utilizou seu código $codeStr na nossa Roleta da Sorte e foi premiado(a) com: $prizeFull! 🎉 Entre em contato conosco para resgatar seu prêmio."
+
+                var clientNameInput by remember { mutableStateOf(spin.clientName ?: clientDisplayName) }
+                var observationInput by remember { mutableStateOf(spin.observation ?: "") }
                 var isEditing by remember { mutableStateOf(false) }
                 val isSelected = selectedIds.contains(spin.id)
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else MaterialTheme.colorScheme.surfaceVariant
-                    )
+                        containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                        else if (linkedClient != null) MaterialTheme.colorScheme.surfaceVariant
+                        else MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                    border = BorderStroke(1.dp, if (linkedClient != null) Color(0xFF10B981).copy(alpha = 0.4f) else Color.Transparent)
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -653,32 +802,139 @@ fun ResultsTab(
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Column {
-                                    Text("Prêmio: ${spin.prizeNameSnapshot}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                                    Text("Desconto: ${spin.discountSnapshot}", fontWeight = FontWeight.Bold)
+                                    Text("Prêmio: ${spin.prizeNameSnapshot}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, fontSize = 16.sp)
+                                    Text("Desconto: ${spin.discountSnapshot}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                 }
                             }
                             IconButton(onClick = { onDeleteSpin(spin.id) }) {
                                 Icon(Icons.Default.Delete, contentDescription = "Excluir", tint = MaterialTheme.colorScheme.error)
                             }
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // Identificação do Cliente vinculado ao Código
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (linkedClient != null) Color(0xFF10B981).copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
+                            border = BorderStroke(1.dp, if (linkedClient != null) Color(0xFF10B981).copy(alpha = 0.3f) else MaterialTheme.colorScheme.outlineVariant)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Icon(
+                                            Icons.Default.Person,
+                                            contentDescription = null,
+                                            tint = if (linkedClient != null) Color(0xFF10B981) else Color.Gray,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Text(
+                                            text = if (clientDisplayName.isNotBlank()) clientDisplayName else "Cliente não cadastrado",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp
+                                        )
+                                        if (linkedClient != null) {
+                                            Surface(
+                                                color = Color(0xFF10B981).copy(alpha = 0.2f),
+                                                shape = RoundedCornerShape(8.dp)
+                                            ) {
+                                                Text(
+                                                    "✓ Cadastrado",
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                    color = Color(0xFF10B981),
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    if (cleanPhone.isNotBlank()) {
+                                        Button(
+                                            onClick = {
+                                                val uri = Uri.parse("https://wa.me/$cleanPhone?text=${Uri.encode(notifyMsg)}")
+                                                val intent = Intent(Intent.ACTION_VIEW, uri)
+                                                context.startActivity(intent)
+                                            },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                            modifier = Modifier.height(32.dp)
+                                        ) {
+                                            Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(12.dp))
+                                            Spacer(modifier = Modifier.width(4.dp))
+                                            Text("Notificar WhatsApp", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    if (clientPhone.isNotBlank()) {
+                                        Text("WhatsApp: $clientPhone", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    if (clientVencimento.isNotBlank()) {
+                                        Text("Vencimento: $clientVencimento", fontSize = 12.sp, color = Color(0xFFEAB308), fontWeight = FontWeight.SemiBold)
+                                    }
+                                    Text("Código Usado: $codeStr", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+
                         if (isEditing) {
-                            OutlinedTextField(value = clientName, onValueChange = { clientName = it }, label = { Text("Cliente") }, modifier = Modifier.fillMaxWidth())
+                            OutlinedTextField(
+                                value = clientNameInput,
+                                onValueChange = { clientNameInput = it },
+                                label = { Text("Nome Manual") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
                             Spacer(modifier = Modifier.height(4.dp))
-                            OutlinedTextField(value = observation, onValueChange = { observation = it }, label = { Text("Observação") }, modifier = Modifier.fillMaxWidth())
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Button(onClick = {
-                                onUpdateSpin(spin, clientName.ifBlank { null }, observation.ifBlank { null })
-                                isEditing = false
-                            }) {
-                                Text("Salvar")
+                            OutlinedTextField(
+                                value = observationInput,
+                                onValueChange = { observationInput = it },
+                                label = { Text("Observação / Anotação") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = {
+                                    onUpdateSpin(spin, clientNameInput.ifBlank { null }, observationInput.ifBlank { null })
+                                    isEditing = false
+                                }) {
+                                    Text("Salvar")
+                                }
+                                TextButton(onClick = { isEditing = false }) {
+                                    Text("Cancelar")
+                                }
                             }
                         } else {
-                            Text("Cliente: ${spin.clientName ?: "Não informado"}")
-                            Text("Observação: ${spin.observation ?: "Nenhuma"}")
-                            Spacer(modifier = Modifier.height(8.dp))
-                            OutlinedButton(onClick = { isEditing = true }) {
-                                Text("Editar Dados do Cliente")
+                            if (!spin.observation.isNullOrBlank()) {
+                                Text("Anotação: ${spin.observation}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                TextButton(onClick = { isEditing = true }) {
+                                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Editar Anotações", fontSize = 12.sp)
+                                }
+                                if (cleanPhone.isNotBlank()) {
+                                    TextButton(onClick = {
+                                        clipboardManager.setText(AnnotatedString(notifyMsg))
+                                        Toast.makeText(context, "Mensagem copiada!", Toast.LENGTH_SHORT).show()
+                                    }) {
+                                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Copiar Mensagem", fontSize = 12.sp)
+                                    }
+                                }
                             }
                         }
                     }
@@ -745,6 +1001,8 @@ fun SettingsTab(
 fun ClientsTab(
     currentCampaign: CampaignEntity?,
     clients: List<ClientEntity>,
+    spins: List<SpinEntity> = emptyList(),
+    accessCodes: List<AccessCodeEntity> = emptyList(),
     promoTemplate: String,
     onSavePromoTemplate: (String) -> Unit,
     onAddBulkClients: (String) -> Unit,
@@ -774,10 +1032,22 @@ fun ClientsTab(
     val pendingCount = clients.count { !it.sent }
     val sentCount = clients.count { it.sent }
 
+    val spunClients = remember(clients, spins, accessCodes) {
+        clients.filter { cl ->
+            spins.any { s ->
+                val code = accessCodes.find { it.id == s.accessCodeId }
+                (code != null && code.code.equals(cl.codigo, ignoreCase = true)) ||
+                (!s.clientName.isNullOrBlank() && s.clientName.equals(cl.nome, ignoreCase = true))
+            }
+        }
+    }
+    val spunCount = spunClients.size
+
     val filteredClients = clients.filter { client ->
         val matchesStatus = when (filterStatus) {
             "pending" -> !client.sent
             "sent" -> client.sent
+            "spun" -> spunClients.contains(client)
             else -> true
         }
         val query = searchQuery.trim().lowercase()
@@ -1034,6 +1304,11 @@ fun ClientsTab(
                         onClick = { filterStatus = "sent" },
                         label = { Text("Enviados ($sentCount)", fontSize = 11.sp) }
                     )
+                    FilterChip(
+                        selected = filterStatus == "spun",
+                        onClick = { filterStatus = "spun" },
+                        label = { Text("Já Giraram ($spunCount)", fontSize = 11.sp) }
+                    )
                 }
 
                 OutlinedTextField(
@@ -1126,6 +1401,26 @@ fun ClientsTab(
                                         fontWeight = FontWeight.Bold,
                                         color = if (client.sent) Color(0xFF047857) else Color(0xFFB45309)
                                     )
+                                }
+
+                                val clientSpin = spins.find { s ->
+                                    val code = accessCodes.find { it.id == s.accessCodeId }
+                                    (code != null && code.code.equals(client.codigo, ignoreCase = true)) ||
+                                    (!s.clientName.isNullOrBlank() && s.clientName.equals(client.nome, ignoreCase = true))
+                                }
+                                if (clientSpin != null) {
+                                    Surface(
+                                        color = Color(0xFFEAB308).copy(alpha = 0.2f),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Text(
+                                            "🏆 Já Girou: ${clientSpin.prizeNameSnapshot} (${clientSpin.discountSnapshot})",
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFFCA8A04)
+                                        )
+                                    }
                                 }
                             }
 

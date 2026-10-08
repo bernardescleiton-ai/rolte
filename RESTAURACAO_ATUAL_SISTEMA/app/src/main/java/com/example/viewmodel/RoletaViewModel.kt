@@ -199,10 +199,18 @@ class RoletaViewModel(application: Application) : AndroidViewModel(application) 
             }
 
             // Record spin
+            val matchingClient = _clients.value.find { 
+                it.codigo.equals(updatedCode.code, ignoreCase = true) || 
+                (it.campaignId == camp.id && it.codigo.equals(updatedCode.code, ignoreCase = true))
+            }
             val spin = SpinEntity(
                 campaignId = camp.id,
                 accessCodeId = updatedCode.id,
                 prizeId = selectedPrize.id,
+                clientName = matchingClient?.nome,
+                observation = if (matchingClient != null) {
+                    "WhatsApp: ${matchingClient.whatsapp}" + if (matchingClient.vencimento.isNotBlank()) " | Vencimento: ${matchingClient.vencimento}" else ""
+                } else null,
                 prizeNameSnapshot = selectedPrize.name,
                 discountSnapshot = selectedPrize.discount
             )

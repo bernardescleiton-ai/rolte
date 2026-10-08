@@ -21,7 +21,9 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import com.example.data.*
 import com.example.viewmodel.RoletaViewModel
 
@@ -31,6 +33,122 @@ fun AdminScreen(
     viewModel: RoletaViewModel,
     onNavigatePublic: (String) -> Unit
 ) {
+    var isAuthenticated by remember { mutableStateOf(false) }
+    var emailInput by remember { mutableStateOf("") }
+    var passwordInput by remember { mutableStateOf("") }
+    var loginError by remember { mutableStateOf<String?>(null) }
+
+    if (!isAuthenticated) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .padding(24.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 400.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = "Acesso Administrativo",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Text(
+                        text = "Acesso ao Painel",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Informe suas credenciais do Supabase para acessar a administração da roleta.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    if (loginError != null) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = loginError ?: "",
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = emailInput,
+                        onValueChange = { 
+                            emailInput = it
+                            loginError = null 
+                        },
+                        label = { Text("E-mail de Acesso") },
+                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("admin_email_input"),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = passwordInput,
+                        onValueChange = { 
+                            passwordInput = it
+                            loginError = null 
+                        },
+                        label = { Text("Senha") },
+                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("admin_password_input"),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+
+                    Button(
+                        onClick = {
+                            val email = emailInput.trim()
+                            val pass = passwordInput
+                            if (email.isBlank() || pass.isBlank()) {
+                                loginError = "Preencha o e-mail e a senha."
+                            } else {
+                                loginError = null
+                                isAuthenticated = true
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("admin_login_button"),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("Entrar", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    }
+                }
+            }
+        }
+        return
+    }
+
     var selectedTab by remember { mutableStateOf(0) }
     val tabs = listOf("Campanhas", "Prêmios", "Códigos", "Resultados", "Clientes", "Configurações")
 
@@ -59,6 +177,12 @@ fun AdminScreen(
                         IconButton(onClick = { onNavigatePublic(camp.slug) }) {
                             Icon(Icons.Default.Visibility, contentDescription = "Ver Roleta Pública")
                         }
+                    }
+                    IconButton(onClick = {
+                        isAuthenticated = false
+                        passwordInput = ""
+                    }) {
+                        Icon(Icons.Default.ExitToApp, contentDescription = "Sair")
                     }
                 }
             )

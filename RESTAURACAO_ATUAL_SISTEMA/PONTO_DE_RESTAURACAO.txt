@@ -1,0 +1,23 @@
+====================================================================
+PONTO DE RESTAURAÇÃO DO SISTEMA - SALVO NO STUDIO
+====================================================================
+Data / Registro: 08/10/2026
+Estado do Sistema: COMPLETO E FUNCIONAL
+
+DESCRIÇÃO DO ESTADO:
+- Sistema com importação e gestão de clientes em massa na aba Administrativa.
+- Separação e parsing automático de Nome, WhatsApp e Data de Vencimento (com tratamento inteligente que impede qualquer inversão entre telefone e data).
+- Geração automática de códigos válidos ("RLT-XXXXXX") para cada cliente inserido.
+- Disparo rápido e direto para WhatsApp com mensagem promocional configurável e tags dinâmicas ({nome}, {codigo}, {link}, {vencimento}).
+- Interface Web (index.html) e Aplicativo Android nativo (Jetpack Compose / Room) 100% integrados e compilando perfeitamente.
+- Roleta funcional com suporte a personalização de imagens de fundo.
+
+ARQUIVOS SALVOS NESTE PONTO DE RESTAURAÇÃO:
+1. index.html (Versão completa da aplicação web)
+2. app/ (Código-fonte completo do Android, incluindo Kotlin, UI, ViewModel, DAOs, Entidades Room, recursos visuais e drawables)
+3. build.gradle.kts, settings.gradle.kts, gradle.properties e metadata.json
+
+COMO RESTAURAR:
+Basta solicitar no chat: "Restaurar o sistema para o ponto de restauração atual"
+e todos os arquivos serão revertidos exatamente para esta versão salva.
+====================================================================

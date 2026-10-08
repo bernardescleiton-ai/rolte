@@ -553,17 +553,8 @@
                     </form>
                 `;
             } else if (!lastWonPrize) {
-                let clientWelcome = '';
-                if (currentCodeObj) {
-                    const codeStr = String(currentCodeObj.code || '').trim().toUpperCase();
-                    const cl = (db.clients || []).find(c => c.codigo && String(c.codigo).trim().toUpperCase() === codeStr);
-                    if (cl && cl.nome) {
-                        clientWelcome = `<div class="bg-yellow-500/15 border border-yellow-500/40 rounded-xl px-3.5 py-2 text-xs text-yellow-300 font-bold flex items-center justify-center gap-1.5 shadow-sm"><i class="fa-solid fa-user-check text-yellow-400"></i> Olá, ${escapeHtml(cl.nome)}! Seu giro exclusivo está liberado:</div>`;
-                    }
-                }
                 return `
                     <div class="space-y-3 bg-slate-900/95 backdrop-blur-md p-6 rounded-3xl border border-yellow-500/40 shadow-2xl">
-                        ${clientWelcome}
                         <p class="text-emerald-400 font-bold text-sm bg-emerald-950/60 py-2.5 px-4 rounded-xl border border-emerald-500/40 shadow-md flex items-center justify-center gap-2">
                             <i class="fa-solid fa-circle-check"></i>
                             <span>${escapeHtml(settings.valid_code_msg || 'Código validado com sucesso!')}</span>
@@ -753,32 +744,14 @@
                 }
             }
 
-            // Record spin & match client
-            const codeStr = String(currentCodeObj.code || '').trim().toUpperCase();
-            const linkedClientIndex = (db.clients || []).findIndex(cl => {
-                if (!cl.codigo) return false;
-                const matchesCamp = String(cl.campaignId) === String(campaignId) || !cl.campaignId;
-                return matchesCamp && String(cl.codigo).trim().toUpperCase() === codeStr;
-            });
-            const linkedClient = linkedClientIndex !== -1 ? db.clients[linkedClientIndex] : null;
-
-            if (linkedClient) {
-                db.clients[linkedClientIndex].hasSpun = true;
-                db.clients[linkedClientIndex].spunAt = Date.now();
-                db.clients[linkedClientIndex].prizeWon = selectedPrize.name;
-                db.clients[linkedClientIndex].prizeDiscount = selectedPrize.discount || selectedPrize.displayText;
-            }
-
+            // Record spin
             const newSpin = {
                 id: Date.now(),
                 campaignId: campaignId,
                 accessCodeId: currentCodeObj.code,
                 prizeId: selectedPrize.id,
-                clientId: linkedClient ? linkedClient.id : null,
-                clientName: linkedClient ? (linkedClient.nome || "") : "",
-                clientPhone: linkedClient ? (linkedClient.whatsapp || "") : "",
-                clientVencimento: linkedClient ? (linkedClient.vencimento || "") : "",
-                observation: linkedClient ? `WhatsApp: ${linkedClient.whatsapp || ''}${linkedClient.vencimento ? ' | Vencimento: ' + linkedClient.vencimento : ''}` : "",
+                clientName: "",
+                observation: "",
                 prizeNameSnapshot: selectedPrize.name,
                 discountSnapshot: selectedPrize.discount || selectedPrize.displayText,
                 createdAt: Date.now()
@@ -1145,96 +1118,31 @@
                                 ` : spins.map(s => {
                                     const isChecked = selectedSpinIds.has(s.id) || selectedSpinIds.has(String(s.id)) || selectedSpinIds.has(Number(s.id));
                                     const spinCamp = (db.campaigns || []).find(c => String(c.id) === String(s.campaignId));
-                                    const sCode = String(s.accessCodeId || '').trim().toUpperCase();
-                                    const linkedClient = (db.clients || []).find(c => 
-                                        (c.codigo && String(c.codigo).trim().toUpperCase() === sCode) ||
-                                        (s.clientId && String(c.id) === String(s.clientId)) ||
-                                        (c.nome && s.clientName && c.nome.trim().toLowerCase() === s.clientName.trim().toLowerCase())
-                                    );
-                                    const clientName = (linkedClient ? linkedClient.nome : (s.clientName || '')).trim();
-                                    const clientPhone = (linkedClient ? (linkedClient.whatsapp || linkedClient.cleanPhone || '') : (s.clientPhone || '')).trim();
-                                    const clientVencimento = (linkedClient ? (linkedClient.vencimento || '') : (s.clientVencimento || '')).trim();
-                                    const cleanPhone = linkedClient ? (linkedClient.cleanPhone || clientPhone.replace(/\D/g, '')) : clientPhone.replace(/\D/g, '');
-                                    const prizeFull = `${s.prizeNameSnapshot || ''}${s.discountSnapshot ? ' (' + s.discountSnapshot + ')' : ''}`;
-
-                                    const waNotifyMsg = `Olá ${clientName || 'Cliente'}! Parabéns, vimos que você utilizou seu código ${s.accessCodeId} na nossa Roleta da Sorte e foi premiado(a) com: ${prizeFull}! 🎉 Entre em contato conosco para resgatar seu prêmio.`;
-
                                     return `
-                                        <div id="spinCard_${s.id}" class="bg-slate-800 p-5 rounded-2xl border ${isChecked ? 'border-yellow-500/80 bg-slate-800/95 shadow-md shadow-yellow-500/10' : (linkedClient ? 'border-emerald-500/30 bg-slate-800/90' : 'border-slate-700')} space-y-3.5 transition">
+                                        <div id="spinCard_${s.id}" class="bg-slate-800 p-5 rounded-2xl border ${isChecked ? 'border-yellow-500/80 bg-slate-800/95 shadow-md shadow-yellow-500/10' : 'border-slate-700'} space-y-3 transition">
                                             <div class="flex justify-between items-start flex-wrap gap-2">
                                                 <div class="flex items-start gap-3">
                                                     <input type="checkbox" value="${s.id}" onchange="toggleSpinSelection(${s.id}, this.checked)" class="spin-checkbox w-5 h-5 mt-1 rounded text-yellow-500 bg-slate-900 border-slate-600 focus:ring-yellow-400 cursor-pointer" ${isChecked ? 'checked' : ''}>
                                                     <div>
                                                         <div class="flex items-center gap-2 flex-wrap">
-                                                            <span class="bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 p-1.5 rounded-xl text-sm flex items-center justify-center">
-                                                                <i class="fa-solid fa-trophy"></i>
-                                                            </span>
                                                             <h3 class="font-bold text-lg text-yellow-400">${escapeHtml(s.prizeNameSnapshot)} (${escapeHtml(s.discountSnapshot)})</h3>
                                                             ${spinCamp ? `<span class="bg-slate-950 text-slate-300 border border-slate-700 text-[10px] px-2 py-0.5 rounded-full font-bold">Campanha: ${escapeHtml(spinCamp.name)}</span>` : ''}
                                                         </div>
-                                                        <p class="text-xs text-slate-400 font-mono mt-0.5">Código Usado: <strong class="text-yellow-300 bg-yellow-400/20 px-1.5 py-0.5 rounded border border-yellow-400/30">${escapeHtml(s.accessCodeId)}</strong> | Data do Giro: ${new Date(s.createdAt).toLocaleString()}</p>
+                                                        <p class="text-xs text-slate-400 font-mono mt-0.5">Código: <span class="text-slate-200 font-bold">${escapeHtml(s.accessCodeId)}</span> | Data: ${new Date(s.createdAt).toLocaleString()}</p>
                                                     </div>
                                                 </div>
                                                 <button onclick="deleteSingleSpin(${s.id})" class="text-red-400 hover:text-red-300 hover:bg-red-500/20 p-2 rounded-xl transition" title="Excluir este giro" style="touch-action: manipulation;">
                                                     <i class="fa-solid fa-trash"></i>
                                                 </button>
                                             </div>
-
-                                            <!-- Identificação Completa do Cliente vinculado ao Código -->
-                                            <div class="bg-slate-900/95 border ${linkedClient ? 'border-emerald-500/50 bg-emerald-950/20 shadow-sm' : 'border-slate-700/80'} p-3.5 rounded-2xl space-y-2.5">
-                                                <div class="flex items-center justify-between flex-wrap gap-2">
-                                                    <div class="flex items-center gap-2 flex-wrap">
-                                                        <span class="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                                                            <i class="fa-solid fa-user-tag text-yellow-400"></i> Cliente Identificado:
-                                                        </span>
-                                                        <span class="text-base font-black text-white">${escapeHtml(clientName || 'Cliente não identificado no cadastro')}</span>
-                                                        ${linkedClient ? `
-                                                            <span class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1">
-                                                                <i class="fa-solid fa-circle-check text-emerald-400"></i> Vinculado à aba Clientes & WhatsApp
-                                                            </span>
-                                                        ` : ''}
-                                                    </div>
-                                                    ${cleanPhone ? `
-                                                        <div class="flex items-center gap-2 flex-wrap">
-                                                            <a href="https://wa.me/${cleanPhone}?text=${encodeURIComponent(waNotifyMsg)}" target="_blank" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 shadow-md shadow-emerald-500/20 cursor-pointer" style="touch-action: manipulation;" title="Conversar no WhatsApp e parabenizar pelo prêmio">
-                                                                <i class="fa-brands fa-whatsapp text-sm"></i> Notificar no WhatsApp
-                                                            </a>
-                                                            <button onclick="copyTextDirectly('${escapeHtml(waNotifyMsg).replace(/'/g, "\\'")}')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-2.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1" title="Copiar mensagem para envio manual">
-                                                                <i class="fa-solid fa-copy"></i> Copiar
-                                                            </button>
-                                                        </div>
-                                                    ` : ''}
-                                                </div>
-                                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs pt-2 border-t border-slate-800/80">
-                                                    <div>
-                                                        <span class="text-slate-400 block text-[11px]">WhatsApp do Cliente:</span>
-                                                        <strong class="font-mono text-emerald-400 flex items-center gap-1 font-bold text-xs">
-                                                            <i class="fa-brands fa-whatsapp"></i> ${escapeHtml(clientPhone || (s.observation ? s.observation : 'Não cadastrado'))}
-                                                        </strong>
-                                                    </div>
-                                                    <div>
-                                                        <span class="text-slate-400 block text-[11px]">Data de Vencimento:</span>
-                                                        <strong class="text-yellow-400 font-bold text-xs flex items-center gap-1">
-                                                            <i class="fa-regular fa-calendar-check"></i> ${escapeHtml(clientVencimento || 'Não informada')}
-                                                        </strong>
-                                                    </div>
-                                                    <div>
-                                                        <span class="text-slate-400 block text-[11px]">Código da Roleta:</span>
-                                                        <strong class="font-mono bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 px-2 py-0.5 rounded text-xs font-bold">
-                                                            ${escapeHtml(s.accessCodeId)}
-                                                        </strong>
-                                                    </div>
-                                                </div>
-                                            </div>
-
                                             <div class="grid sm:grid-cols-2 gap-3 pt-1">
                                                 <div>
-                                                    <label class="block text-[11px] text-slate-400 font-semibold mb-1">Nome Manual (se desejar alterar):</label>
-                                                    <input type="text" value="${escapeHtml(s.clientName || clientName || '')}" onchange="updateSpinClient(${s.id}, 'clientName', this.value)" placeholder="Digite o nome do cliente" class="w-full bg-slate-900 border border-slate-700 px-3 py-2 rounded-xl text-sm text-white" style="font-size: 15px !important;">
+                                                    <label class="block text-[11px] text-slate-400 font-semibold mb-1">Nome do Cliente:</label>
+                                                    <input type="text" value="${escapeHtml(s.clientName || '')}" onchange="updateSpinClient(${s.id}, 'clientName', this.value)" placeholder="Digite o nome do cliente" class="w-full bg-slate-900 border border-slate-700 px-3 py-2 rounded-xl text-sm text-white" style="font-size: 16px !important;">
                                                 </div>
                                                 <div>
-                                                    <label class="block text-[11px] text-slate-400 font-semibold mb-1">Observações Internas / Cupom:</label>
-                                                    <input type="text" value="${escapeHtml(s.observation || (clientPhone ? 'WhatsApp: ' + clientPhone : ''))}" onchange="updateSpinClient(${s.id}, 'observation', this.value)" placeholder="ex: Prêmio entregue, cupom gerado..." class="w-full bg-slate-900 border border-slate-700 px-3 py-2 rounded-xl text-sm text-white" style="font-size: 15px !important;">
+                                                    <label class="block text-[11px] text-slate-400 font-semibold mb-1">Observação / WhatsApp:</label>
+                                                    <input type="text" value="${escapeHtml(s.observation || '')}" onchange="updateSpinClient(${s.id}, 'observation', this.value)" placeholder="ex: WhatsApp ou cupom gerado" class="w-full bg-slate-900 border border-slate-700 px-3 py-2 rounded-xl text-sm text-white" style="font-size: 16px !important;">
                                                 </div>
                                             </div>
                                         </div>
@@ -1747,19 +1655,6 @@
             }
         }
 
-        function copyTextDirectly(text) {
-            if (!text) return;
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(text).then(() => {
-                    showToast("Texto copiado para a área de transferência!", "success");
-                }).catch(() => {
-                    prompt("Copie a mensagem abaixo:", text);
-                });
-            } else {
-                prompt("Copie a mensagem abaixo:", text);
-            }
-        }
-
         function toggleClientSent(clientId) {
             const db = loadDB();
             const client = (db.clients || []).find(c => String(c.id) === String(clientId));
@@ -1865,21 +1760,12 @@
             const totalCount = clients.length;
             const pendingCount = clients.filter(c => !c.sent).length;
             const sentCount = clients.filter(c => c.sent).length;
-            const spunClients = clients.filter(c => 
-                (db.spins || []).some(s => 
-                    (s.accessCodeId && c.codigo && String(s.accessCodeId).trim().toUpperCase() === String(c.codigo).trim().toUpperCase()) ||
-                    (s.clientId && String(s.clientId) === String(c.id))
-                )
-            );
-            const spunCount = spunClients.length;
 
             let filteredList = clients;
             if (clientFilterStatus === 'pending') {
                 filteredList = clients.filter(c => !c.sent);
             } else if (clientFilterStatus === 'sent') {
                 filteredList = clients.filter(c => c.sent);
-            } else if (clientFilterStatus === 'spun') {
-                filteredList = spunClients;
             }
 
             if (clientSearchQuery) {
@@ -2013,7 +1899,7 @@
                                     <input type="checkbox" onchange="toggleSelectAllClients(this.checked, ${activeCamp.id})" class="w-4 h-4 rounded text-yellow-500 bg-slate-900 border-slate-600 focus:ring-yellow-400" ${allSelected ? 'checked' : ''}>
                                     <span>Selecionar Todos</span>
                                 </label>
-                                <div class="flex items-center bg-slate-950 border border-slate-700 p-1 rounded-xl flex-wrap gap-1">
+                                <div class="flex items-center bg-slate-950 border border-slate-700 p-1 rounded-xl">
                                     <button onclick="setClientFilter('all')" class="px-3 py-1 rounded-lg transition font-bold ${clientFilterStatus === 'all' ? 'bg-yellow-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}">
                                         Todos (${totalCount})
                                     </button>
@@ -2022,9 +1908,6 @@
                                     </button>
                                     <button onclick="setClientFilter('sent')" class="px-3 py-1 rounded-lg transition font-bold ${clientFilterStatus === 'sent' ? 'bg-yellow-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}">
                                         Enviados (${sentCount})
-                                    </button>
-                                    <button onclick="setClientFilter('spun')" class="px-3 py-1 rounded-lg transition font-bold ${clientFilterStatus === 'spun' ? 'bg-yellow-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}">
-                                        Já Giraram (${spunCount})
                                     </button>
                                 </div>
                             </div>
@@ -2045,12 +1928,8 @@
                                 </div>
                             ` : filteredList.map(c => {
                                 const isChecked = selectedClientIds.has(c.id) || selectedClientIds.has(String(c.id));
-                                const clientSpin = (db.spins || []).find(s => 
-                                    (s.accessCodeId && c.codigo && String(s.accessCodeId).trim().toUpperCase() === String(c.codigo).trim().toUpperCase()) ||
-                                    (s.clientId && String(s.clientId) === String(c.id))
-                                );
                                 return `
-                                    <div class="bg-slate-800 p-4.5 rounded-2xl border ${isChecked ? 'border-yellow-400 bg-slate-800/95 shadow-md shadow-yellow-500/10' : (clientSpin ? 'border-yellow-500/50 bg-slate-800/90' : (c.sent ? 'border-slate-700/80 bg-slate-800/70' : 'border-slate-700'))} flex justify-between items-center flex-wrap gap-4 transition hover:border-yellow-500/50">
+                                    <div class="bg-slate-800 p-4.5 rounded-2xl border ${isChecked ? 'border-yellow-400 bg-slate-800/95 shadow-md shadow-yellow-500/10' : (c.sent ? 'border-slate-700/80 bg-slate-800/70' : 'border-slate-700')} flex justify-between items-center flex-wrap gap-4 transition hover:border-yellow-500/50">
                                         <div class="flex items-center gap-3.5">
                                             <input type="checkbox" onchange="toggleClientSelection(${c.id}, this.checked)" class="w-4 h-4 rounded text-yellow-500 bg-slate-900 border-slate-600 focus:ring-yellow-400 cursor-pointer" ${isChecked ? 'checked' : ''}>
                                             <div class="space-y-1">
@@ -2059,11 +1938,6 @@
                                                     <span class="px-2 py-0.5 rounded-full text-[11px] font-bold ${c.sent ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-300'}">
                                                         ${c.sent ? 'Enviado' : 'Pendente de Envio'}
                                                     </span>
-                                                    ${clientSpin ? `
-                                                        <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 flex items-center gap-1 shadow-sm">
-                                                            <i class="fa-solid fa-trophy text-yellow-400"></i> Já Girou: <strong>${escapeHtml(clientSpin.prizeNameSnapshot)}</strong> (${escapeHtml(clientSpin.discountSnapshot)})
-                                                        </span>
-                                                    ` : ''}
                                                     ${c.sent && c.sentAt ? `
                                                         <span class="text-slate-500 text-[10px] font-mono">${new Date(c.sentAt).toLocaleDateString()} às ${new Date(c.sentAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                                                     ` : ''}
@@ -2952,19 +2826,10 @@
             const activeCamp = getActiveAdminCampaign(db);
             const allSpins = db.spins || [];
             const spinsToExport = resultsFilterMode === 'all' ? allSpins : allSpins.filter(s => String(s.campaignId) === String(activeCamp.id));
-            let csv = "Campanha,Codigo,Cliente,WhatsApp,Vencimento,Premio,Valor,Data,Observacao\n";
+            let csv = "Campanha,Codigo,Cliente,Premio,Valor,Data,Observacao\n";
             spinsToExport.forEach(s => {
                 const cName = ((db.campaigns || []).find(c => String(c.id) === String(s.campaignId)) || {}).name || activeCamp.name;
-                const sCode = String(s.accessCodeId || '').trim().toUpperCase();
-                const linkedClient = (db.clients || []).find(c => 
-                    (c.codigo && String(c.codigo).trim().toUpperCase() === sCode) ||
-                    (s.clientId && String(c.id) === String(s.clientId)) ||
-                    (c.nome && s.clientName && c.nome.trim().toLowerCase() === s.clientName.trim().toLowerCase())
-                );
-                const clientName = (linkedClient ? linkedClient.nome : (s.clientName || '')).trim();
-                const clientPhone = (linkedClient ? (linkedClient.whatsapp || linkedClient.cleanPhone || '') : (s.clientPhone || '')).trim();
-                const clientVencimento = (linkedClient ? (linkedClient.vencimento || '') : (s.clientVencimento || '')).trim();
-                csv += `"${cName}","${s.accessCodeId}","${clientName}","${clientPhone}","${clientVencimento}","${s.prizeNameSnapshot}","${s.discountSnapshot}","${new Date(s.createdAt).toISOString()}","${s.observation || ''}"\n`;
+                csv += `"${cName}","${s.accessCodeId}","${s.clientName || ''}","${s.prizeNameSnapshot}","${s.discountSnapshot}","${new Date(s.createdAt).toISOString()}","${s.observation || ''}"\n`;
             });
             downloadCSV(csv, resultsFilterMode === 'all' ? "resultados_todas_campanhas.csv" : `resultados_${activeCamp.slug}.csv`);
         }

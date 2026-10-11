@@ -73,12 +73,40 @@
         let supabaseStatus = "connected"; // "connected", "syncing", "error"
         let supabaseErrorMessage = "";
         let isSaving = false;
+        let isFetchingFromSupabase = false;
+
+        // In-memory global cache: Guarantees instant access on iOS and prevents QuotaExceededError in WebKit/Safari
+        let globalMemoryDB = null;
 
         // In-memory draft for admin settings to prevent any reset while typing
         let settingsDraft = {};
 
         // --- Database & LocalStorage State Management ---
         const DB_KEY = "roleta_db_v1";
+
+        function safeSetLocalStorage(key, dataObj) {
+            if (!dataObj) return;
+            try {
+                const raw = JSON.stringify(dataObj);
+                localStorage.setItem(key, raw);
+            } catch (quotaErr) {
+                console.warn("localStorage quota exceeded on iOS Safari. Saving stripped lightweight copy:", quotaErr);
+                try {
+                    // Clone and strip massive base64 images from localStorage copy ONLY (kept safely in globalMemoryDB and Supabase)
+                    const light = JSON.parse(JSON.stringify(dataObj));
+                    if (light.settings) {
+                        for (let k in light.settings) {
+                            if (light.settings[k] && light.settings[k].bg_image && light.settings[k].bg_image.length > 20000) {
+                                light.settings[k].bg_image = "";
+                            }
+                        }
+                    }
+                    localStorage.setItem(key, JSON.stringify(light));
+                } catch (e2) {
+                    console.warn("Unable to write even light db to localStorage:", e2);
+                }
+            }
+        }
 
         function escapeHtml(str) {
             if (str === null || str === undefined) return "";
@@ -137,17 +165,22 @@
         }
 
         function loadDB() {
+            if (globalMemoryDB && globalMemoryDB.campaigns && globalMemoryDB.codes && globalMemoryDB.codes.length > 0) {
+                return globalMemoryDB;
+            }
             const data = localStorage.getItem(DB_KEY);
             if (!data) {
                 const initial = getInitialData();
-                localStorage.setItem(DB_KEY, JSON.stringify(initial));
+                safeSetLocalStorage(DB_KEY, initial);
+                globalMemoryDB = initial;
                 return initial;
             }
             try {
                 const parsed = JSON.parse(data);
                 if (!parsed.campaigns || !parsed.prizes) {
                     const initial = getInitialData();
-                    localStorage.setItem(DB_KEY, JSON.stringify(initial));
+                    safeSetLocalStorage(DB_KEY, initial);
+                    globalMemoryDB = initial;
                     return initial;
                 }
                 if (!parsed.clients) parsed.clients = [];
@@ -174,10 +207,12 @@
                         }
                     }
                 });
+                globalMemoryDB = parsed;
                 return parsed;
             } catch (e) {
                 const initial = getInitialData();
-                localStorage.setItem(DB_KEY, JSON.stringify(initial));
+                safeSetLocalStorage(DB_KEY, initial);
+                globalMemoryDB = initial;
                 return initial;
             }
         }
@@ -205,6 +240,8 @@
         }
 
         async function fetchFromSupabase(silent = false) {
+            if (isFetchingFromSupabase) return;
+            isFetchingFromSupabase = true;
             try {
                 const res = await fetch(`${SUPABASE_URL}/rest/v1/user_favorites?song_id=eq.roleta_config`, {
                     headers: {
@@ -225,9 +262,13 @@
                         supabaseErrorMessage = "";
                         updateSupabaseUI();
 
+                        // 1. Immediately store in RAM so iOS Safari has instant access to all codes, clients, and campaigns
+                        globalMemoryDB = cloudData;
+                        // 2. Safely persist to localStorage with quota protection for iOS
+                        safeSetLocalStorage(DB_KEY, cloudData);
+
                         const isCurrentAdmin = window.location.hash.includes("admin");
 
-                        // If user is inside admin panel, NEVER silently re-render and wipe their editing form!
                         if (isCurrentAdmin) {
                             const local = loadDB();
                             // Keep cloud data in sync
@@ -237,11 +278,11 @@
                             if (cloudData.clients && adminTab !== 'bulk_clients') local.clients = cloudData.clients;
                             if (cloudData.prizes && adminTab !== 'prizes') local.prizes = cloudData.prizes;
                             
-                            // Only adopt cloud settings if user has not typed any local draft
                             if (Object.keys(settingsDraft).length === 0 && cloudData.settings) {
                                 local.settings = cloudData.settings;
                             }
-                            localStorage.setItem(DB_KEY, JSON.stringify(local));
+                            globalMemoryDB = local;
+                            safeSetLocalStorage(DB_KEY, local);
 
                             if (!silent) {
                                 showToast("Sincronizado com Supabase com sucesso!", "success");
@@ -251,18 +292,11 @@
                         }
 
                         // For public roleta: only update when user is NOT typing a code and not spinning
-                        const localRaw = localStorage.getItem(DB_KEY);
-                        const cloudRaw = JSON.stringify(cloudData);
+                        const codeInput = document.getElementById("codeInput");
+                        const isTypingCode = codeInput && (document.activeElement === codeInput || codeInput.value.length > 0);
 
-                        if (localRaw !== cloudRaw) {
-                            localStorage.setItem(DB_KEY, cloudRaw);
-                            
-                            const codeInput = document.getElementById("codeInput");
-                            const isTypingCode = codeInput && (document.activeElement === codeInput || codeInput.value.length > 0);
-
-                            if (!isTypingCode && !isSpinning && !currentCodeObj) {
-                                router();
-                            }
+                        if (!isTypingCode && !isSpinning && !currentCodeObj) {
+                            router();
                         }
                         if (!silent) showToast("Sincronizado com Supabase com sucesso!", "success");
                         return;
@@ -280,6 +314,8 @@
                 supabaseErrorMessage = e.message || "Erro de conexão";
                 updateSupabaseUI();
                 if (!silent) showToast("Erro ao conectar com Supabase: " + supabaseErrorMessage, "error");
+            } finally {
+                isFetchingFromSupabase = false;
             }
         }
 
@@ -320,7 +356,8 @@
         }
 
         function saveDB(db, notify = true) {
-            localStorage.setItem(DB_KEY, JSON.stringify(db));
+            globalMemoryDB = db;
+            safeSetLocalStorage(DB_KEY, db);
             saveToSupabase(db, notify);
         }
 

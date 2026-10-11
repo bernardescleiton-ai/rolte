@@ -418,6 +418,58 @@
             router();
         }
 
+        // --- iOS & Universal Code Normalization Helpers ---
+        function normalizeCode(str) {
+            if (!str) return "";
+            return String(str)
+                // Remove zero-width spaces, BOM, non-breaking spaces, and invisible unicode (common in iOS WhatsApp pastes)
+                .replace(/[\u200B-\u200D\uFEFF\u00A0\u202F\u2000-\u200A\u00AD]/g, "")
+                // Normalize iOS Smart Punctuation dash variants (en-dash, em-dash, minus, hyphen-minus) to standard ASCII '-'
+                .replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g, "-")
+                // Remove any whitespace
+                .replace(/\s+/g, "")
+                .trim()
+                .toUpperCase();
+        }
+
+        function normalizeInputCode(val) {
+            if (!val) return "";
+            return String(val)
+                .replace(/[\u200B-\u200D\uFEFF\u00A0\u202F\u2000-\u200A\u00AD]/g, "")
+                .replace(/[\u2010-\u2015\u2212\uFE58\uFE63\uFF0D]/g, "-")
+                .replace(/\s+/g, "")
+                .toUpperCase();
+        }
+
+        function extractCodeFromUrl() {
+            try {
+                // Check search params (?codigo=... or ?code=...)
+                const searchParams = new URLSearchParams(window.location.search);
+                let code = searchParams.get("codigo") || searchParams.get("code") || searchParams.get("c");
+                if (code) return normalizeCode(code);
+
+                // Check hash query params (#roleta/outubro?codigo=... or #roleta/outubro&codigo=...)
+                const hash = window.location.hash || "";
+                if (hash.includes("?")) {
+                    const hashSearch = hash.split("?")[1];
+                    const hashParams = new URLSearchParams(hashSearch);
+                    code = hashParams.get("codigo") || hashParams.get("code") || hashParams.get("c");
+                    if (code) return normalizeCode(code);
+                }
+                if (hash.includes("&codigo=")) {
+                    const match = hash.match(/&codigo=([^&]+)/);
+                    if (match && match[1]) return normalizeCode(match[1]);
+                }
+                if (hash.includes("&code=")) {
+                    const match = hash.match(/&code=([^&]+)/);
+                    if (match && match[1]) return normalizeCode(match[1]);
+                }
+            } catch (e) {
+                console.warn("URL code extract error:", e);
+            }
+            return "";
+        }
+
         function router() {
             try {
                 const hash = window.location.hash;
@@ -433,7 +485,8 @@
                 } else {
                     let slug = "outubro";
                     if (hash.startsWith("#roleta/")) {
-                        slug = hash.replace("#roleta/", "");
+                        // Strip query strings or hash parameters from slug for clean campaign matching
+                        slug = hash.replace("#roleta/", "").split("?")[0].split("&")[0];
                     }
                     const campaign = (db.campaigns || []).find(c => c.slug === slug) || (db.campaigns || [])[0];
                     renderPublicRoleta(app, db, campaign);
@@ -467,7 +520,7 @@
             let prizes = (db.prizes || []).filter(p => String(p.campaignId) === String(campaign.id) && p.active !== false && (p.unlimitedQuantity || p.quantity === undefined || p.quantity > 0));
 
             container.innerHTML = `
-                <div class="flex-1 flex flex-col items-center justify-center p-4 relative transition-colors duration-300 min-h-screen overflow-hidden" style="background-color: ${settings.bg_color || '#060913'}; color: ${settings.text_color || '#FFFFFF'};">
+                <div class="flex-1 flex flex-col items-center justify-center p-4 relative transition-colors duration-300 min-h-[100dvh] overflow-y-auto" style="-webkit-overflow-scrolling: touch; background-color: ${settings.bg_color || '#060913'}; color: ${settings.text_color || '#FFFFFF'};">
                     ${settings.bg_image ? `
                         <div class="absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none transition-all duration-500" style="background-image: url('${settings.bg_image}');"></div>
                         <div class="absolute inset-0 bg-slate-950/70 backdrop-blur-[1px] pointer-events-none"></div>
@@ -529,14 +582,27 @@
 
             drawWheel(prizes, currentRotation);
             requestAnimationFrame(() => drawWheel(prizes, currentRotation));
+
+            // Auto-fill and auto-validate code if passed via URL (iOS WhatsApp links)
+            const urlPresetCode = extractCodeFromUrl();
+            if (urlPresetCode && !currentCodeObj) {
+                setTimeout(() => {
+                    const inputElem = document.getElementById("codeInput");
+                    if (inputElem) {
+                        inputElem.value = urlPresetCode;
+                        validateCode(campaign.id);
+                    }
+                }, 150);
+            }
         }
 
         function getInteractionAreaHtml(campaign, db, settings) {
             if (!settings) settings = getActiveSettings(db, campaign ? campaign.id : 1);
+            const urlPresetCode = (!currentCodeObj) ? extractCodeFromUrl() : '';
 
             if (!currentCodeObj) {
                 return `
-                    <form onsubmit="return handleCodeSubmit(event, ${campaign.id})" class="space-y-4 bg-slate-900/95 backdrop-blur-md p-6 rounded-3xl border border-yellow-500/40 shadow-2xl">
+                    <form id="codeForm" onsubmit="handleCodeSubmit(event, ${campaign.id}); return false;" action="javascript:void(0);" class="space-y-4 bg-slate-900/95 backdrop-blur-md p-6 rounded-3xl border border-yellow-500/40 shadow-2xl">
                         <div class="space-y-1">
                             <input type="text" id="codeInput" 
                                 placeholder="${escapeHtml(settings.code_placeholder || 'Digite seu código (ex: RLT-7X92KP)')}" 
@@ -546,10 +612,17 @@
                                 spellcheck="false" 
                                 inputmode="text" 
                                 enterkeyhint="go"
+                                value="${escapeHtml(urlPresetCode)}"
+                                oninput="this.value = normalizeInputCode(this.value)"
+                                onkeydown="if(event.key === 'Enter') { event.preventDefault(); handleCodeSubmit(event, ${campaign.id}); }"
                                 class="w-full px-4 py-4 rounded-2xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-yellow-400 text-center font-black tracking-widest uppercase text-base shadow-inner"
-                                style="font-size: 16px !important; -webkit-appearance: none;">
+                                style="font-size: 16px !important; -webkit-appearance: none; -webkit-tap-highlight-color: transparent;">
                         </div>
-                        <button type="submit" id="liberateBtn" class="w-full py-4 rounded-2xl font-black text-base hover:scale-[1.02] active:scale-[0.98] transition uppercase tracking-wider shadow-lg flex items-center justify-center gap-2" style="background-color: ${settings.btn_color || '#FACC15'}; color: ${settings.btn_text_color || '#1E1B4B'}; touch-action: manipulation;">
+                        <button type="button" id="liberateBtn" 
+                            onclick="handleCodeSubmit(event, ${campaign.id})"
+                            ontouchend="handleLiberateTouch(event, ${campaign.id})"
+                            class="w-full py-4 rounded-2xl font-black text-base hover:scale-[1.02] active:scale-[0.98] transition uppercase tracking-wider shadow-lg flex items-center justify-center gap-2 cursor-pointer select-none" 
+                            style="background-color: ${settings.btn_color || '#FACC15'}; color: ${settings.btn_text_color || '#1E1B4B'}; touch-action: manipulation; -webkit-tap-highlight-color: transparent;">
                             <span>${escapeHtml(settings.liberate_button || 'LIBERAR ROLETA')}</span>
                             <i class="fa-solid fa-lock-open text-sm"></i>
                         </button>
@@ -559,8 +632,8 @@
             } else if (!lastWonPrize) {
                 let clientWelcome = '';
                 if (currentCodeObj) {
-                    const codeStr = String(currentCodeObj.code || '').trim().toUpperCase();
-                    const cl = (db.clients || []).find(c => c.codigo && String(c.codigo).trim().toUpperCase() === codeStr);
+                    const codeStr = normalizeCode(currentCodeObj.code);
+                    const cl = (db.clients || []).find(c => c.codigo && normalizeCode(c.codigo) === codeStr);
                     if (cl && cl.nome) {
                         clientWelcome = `<div class="bg-yellow-500/15 border border-yellow-500/40 rounded-xl px-3.5 py-2 text-xs text-yellow-300 font-bold flex items-center justify-center gap-1.5 shadow-sm"><i class="fa-solid fa-user-check text-yellow-400"></i> Olá, ${escapeHtml(cl.nome)}! Seu giro exclusivo está liberado:</div>`;
                     }
@@ -572,7 +645,7 @@
                             <i class="fa-solid fa-circle-check"></i>
                             <span>${escapeHtml(settings.valid_code_msg || 'Código validado com sucesso!')}</span>
                         </p>
-                        <button onclick="spinWheel(${campaign.id})" id="spinBtn" class="w-full py-5 rounded-2xl font-black text-lg sm:text-xl shadow-[0_8px_35px_rgba(250,204,21,0.8)] hover:scale-[1.02] active:scale-[0.98] transition uppercase tracking-wider flex items-center justify-center gap-3" style="background-color: ${settings.btn_color || '#FACC15'}; color: ${settings.btn_text_color || '#1E1B4B'}; touch-action: manipulation;">
+                        <button onclick="spinWheel(${campaign.id})" ontouchend="spinWheel(${campaign.id})" id="spinBtn" class="w-full py-5 rounded-2xl font-black text-lg sm:text-xl shadow-[0_8px_35px_rgba(250,204,21,0.8)] hover:scale-[1.02] active:scale-[0.98] transition uppercase tracking-wider flex items-center justify-center gap-3 cursor-pointer select-none" style="background-color: ${settings.btn_color || '#FACC15'}; color: ${settings.btn_text_color || '#1E1B4B'}; touch-action: manipulation; -webkit-tap-highlight-color: transparent;">
                             <span>${escapeHtml(settings.spin_button || 'CLIQUE AQUI E GIRE A ROLETA')}</span>
                             <i class="fa-solid fa-hand-pointer text-xl animate-bounce"></i>
                         </button>
@@ -586,7 +659,7 @@
                         <div class="text-3xl font-black text-white drop-shadow-[0_2px_8px_rgba(251,191,36,0.7)]">${escapeHtml(lastWonPrize.resultText || lastWonPrize.name)}</div>
                         <p class="text-sm text-slate-300">${escapeHtml(lastWonPrize.description || '')}</p>
                         <p class="text-xs text-yellow-400/80 mt-2 font-medium">${escapeHtml(settings.result_success_msg || 'Seu prêmio foi registrado com sucesso no sistema.')}</p>
-                        <button onclick="resetAndReload(${campaign.id})" class="mt-4 px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-yellow-400 font-bold text-xs uppercase tracking-wider transition shadow-md" style="touch-action: manipulation;">Girar Novamente</button>
+                        <button onclick="resetAndReload(${campaign.id})" class="mt-4 px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-yellow-400 font-bold text-xs uppercase tracking-wider transition shadow-md" style="touch-action: manipulation; -webkit-tap-highlight-color: transparent;">Girar Novamente</button>
                     </div>
                 `;
             }
@@ -662,10 +735,40 @@
             ctx.restore();
         }
 
+        let lastCodeSubmitTime = 0;
+
+        function handleLiberateTouch(e, campaignId) {
+            const now = Date.now();
+            if (now - lastCodeSubmitTime < 600) return;
+            lastCodeSubmitTime = now;
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            const inputElem = document.getElementById("codeInput");
+            if (inputElem && typeof inputElem.blur === 'function') {
+                inputElem.blur();
+            }
+            if (document.activeElement && typeof document.activeElement.blur === 'function') {
+                document.activeElement.blur();
+            }
+            validateCode(campaignId);
+        }
+
         function handleCodeSubmit(e, campaignId) {
             if (e) {
                 e.preventDefault();
                 e.stopPropagation();
+            }
+            const now = Date.now();
+            if (now - lastCodeSubmitTime < 600) return false;
+            lastCodeSubmitTime = now;
+            const inputElem = document.getElementById("codeInput");
+            if (inputElem && typeof inputElem.blur === 'function') {
+                inputElem.blur();
+            }
+            if (document.activeElement && typeof document.activeElement.blur === 'function') {
+                document.activeElement.blur();
             }
             validateCode(campaignId);
             return false;
@@ -673,7 +776,8 @@
 
         function validateCode(campaignId) {
             const inputElem = document.getElementById("codeInput");
-            const input = inputElem ? inputElem.value.trim().toUpperCase() : "";
+            const rawVal = inputElem ? inputElem.value : "";
+            const input = normalizeCode(rawVal);
             const db = loadDB();
             const errDiv = document.getElementById("codeError");
 
@@ -682,7 +786,36 @@
                 return;
             }
 
-            const codeObj = (db.codes || []).find(c => String(c.campaignId) === String(campaignId) && c.code === input);
+            // 1. Check in db.codes for this campaign (case, dash, and zero-width spaces normalized)
+            let codeObj = (db.codes || []).find(c => 
+                normalizeCode(c.code) === input && 
+                (String(c.campaignId) === String(campaignId) || !c.campaignId)
+            );
+
+            // 1b. If not found in current campaign, search across any campaign in db.codes
+            if (!codeObj) {
+                codeObj = (db.codes || []).find(c => normalizeCode(c.code) === input);
+            }
+
+            // 2. If not in db.codes, check if code belongs to a client in db.clients
+            if (!codeObj) {
+                const linkedClient = (db.clients || []).find(cl => 
+                    cl.codigo && normalizeCode(cl.codigo) === input
+                );
+                if (linkedClient) {
+                    codeObj = {
+                        id: Date.now(),
+                        campaignId: linkedClient.campaignId || campaignId,
+                        code: input,
+                        status: "AVAILABLE",
+                        usedAt: null
+                    };
+                    if (!db.codes) db.codes = [];
+                    db.codes.push(codeObj);
+                    saveDB(db, false);
+                }
+            }
+
             if (!codeObj) {
                 if (errDiv) errDiv.innerText = "Código inválido.";
                 return;
@@ -757,12 +890,12 @@
                 }
             }
 
-            // Record spin & match client
-            const codeStr = String(currentCodeObj.code || '').trim().toUpperCase();
+            // Record spin & match client with normalized code
+            const codeStr = normalizeCode(currentCodeObj.code);
             const linkedClientIndex = (db.clients || []).findIndex(cl => {
                 if (!cl.codigo) return false;
                 const matchesCamp = String(cl.campaignId) === String(campaignId) || !cl.campaignId;
-                return matchesCamp && String(cl.codigo).trim().toUpperCase() === codeStr;
+                return matchesCamp && normalizeCode(cl.codigo) === codeStr;
             });
             const linkedClient = linkedClientIndex !== -1 ? db.clients[linkedClientIndex] : null;
 
